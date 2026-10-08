@@ -1488,5 +1488,9 @@ renderer.setAnimationLoop((time) => {
     renderer.render(scene, camera);
   }
 });
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
 </script>
 

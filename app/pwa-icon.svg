@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Brain Device icon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe3ea"/>
+    </linearGradient>
+    <radialGradient id="h" cx="35%" cy="28%" r="75%">
+      <stop offset="0" stop-color="#f7c0c0"/>
+      <stop offset="1" stop-color="#8f1d26"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#f5f5f7"/>
+  <circle cx="256" cy="258" r="150" fill="url(#g)"/>
+  <path d="M192 156c-31 0-56 25-56 56 0 18 9 34 22 44-12 11-20 27-20 45 0 33 27 60 60 60 10 0 19-2 28-7 13 15 33 24 55 24 36 0 66-25 74-58 28-8 48-33 48-62 0-34-27-62-61-62-6 0-12 1-18 3-12-27-39-46-71-46-14 0-27 3-39 9-8-4-20-6-32-6z" fill="url(#h)"/>
+  <circle cx="186" cy="222" r="15" fill="#ffd5d8" opacity=".85"/>
+  <circle cx="315" cy="215" r="14" fill="#ffd5d8" opacity=".85"/>
+  <path d="M210 300c18 10 73 10 92 0" fill="none" stroke="#ffd5d8" stroke-width="18" stroke-linecap="round"/>
+</svg>

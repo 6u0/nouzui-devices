@@ -3,8 +3,16 @@
   "short_name": "脳デバイス",
   "lang": "ja",
   "start_url": "./",
-  "scope": "/",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f5f5f7",
-  "theme_color": "#f5f5f7"
+  "theme_color": "#f5f5f7",
+  "icons": [
+    {
+      "src": "pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

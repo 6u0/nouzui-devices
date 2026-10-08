@@ -6,6 +6,7 @@
 const fs = require('fs'), path = require('path');
 const src = process.argv[2] || 'app', out = process.argv[3] || 'dist';
 const page = fs.readFileSync(path.join(src, 'index.html'), 'utf8');
+const optionalFiles = ['model.json', 'manifest.webmanifest', 'sw.js', 'pwa-icon.svg'];
 const head = `<!doctype html>
 <html lang="ja">
 <head>
@@ -17,6 +18,8 @@ const head = `<!doctype html>
 `;
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'index.html'), head + page + '\n</body>\n</html>\n');
-fs.copyFileSync(path.join(src, 'model.json'), path.join(out, 'model.json'));
-fs.copyFileSync(path.join(src, 'manifest.webmanifest'), path.join(out, 'manifest.webmanifest'));
-console.log(`wrote ${out}/index.html + model.json + manifest.webmanifest`);
+for (const fileName of optionalFiles) {
+	const sourcePath = path.join(src, fileName);
+	if (fs.existsSync(sourcePath)) fs.copyFileSync(sourcePath, path.join(out, fileName));
+}
+console.log(`wrote ${out}/index.html + optional static assets`);
