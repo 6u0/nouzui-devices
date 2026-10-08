@@ -358,32 +358,108 @@ const LAYER_GAP = 12;  // mm per 'layer' inside a floor at 100%
 const CLEARANCE = 10;  // mm between floors at 100%
 const BASE_LIFT = 10;  // mm the bottom floor (stand) rises at 100%
 
-// Surface finish by original STEP colour
-const FINISH = {
-  f3cb7c: { metalness: 1, roughness: 0.26 },      // gold-plated pins / pads
-  f4e5a7: { metalness: 1, roughness: 0.3 },
-  d1ccc0: { metalness: 0.9, roughness: 0.3 },     // tin / steel
-  cbcbcb: { metalness: 0.95, roughness: 0.28 },   // screws
-  ffffff: { metalness: 0.85, roughness: 0.3 },
-  f6f6f3: { metalness: 0.8, roughness: 0.32 },
-  cbcbad: { metalness: 0, roughness: 0.55 },      // grove socket plastic
-  b39657: { metalness: 0, roughness: 0.5 },       // ceramic
-  191919: { metalness: 0, roughness: 0.32, clearcoat: 0.4 },
-  434343: { metalness: 0, roughness: 0.45 },
-  cad1ee: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // PCB w/ solder mask
-  f7e9d1: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 },
-  db620b: { metalness: 0, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 }, // M5 body
-  a0a0a0: { metalness: 0, roughness: 0.72 },  // printed parts
-  '3f3f3f': { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 }, // printed carbon shell
-  e5e8e5: { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 },   // PET film
-  '212124': { metalness: 0, roughness: 0.75 },                   // carbon ink
-  d1d1cc: { metalness: 0.9, roughness: 0.35 },                   // silver electrode
-  bfc2c7: { metalness: 0.95, roughness: 0.28 },                  // crimp terminal
-  b8bac2: { metalness: 0.95, roughness: 0.28 },                  // terminal pin
-  f7f7f5: { metalness: 0, roughness: 0.6 },                      // white stiffener
-  c4c5c4: { metalness: 0.9, roughness: 0.3 },                    // KY-003 pins
-  '404040': { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // KY-003 PCB
+// Surface finish per CAD face colour. The STEP gives each face its own colour (baked into the vertex
+// colours), and one solid often mixes materials (an ESP32 module = black PCB + tinned shield + gold
+// castellations), so each mesh is split by face colour at load and every piece gets its real finish.
+// env: reflection strength. Set per material (scene.environmentIntensity, 0.55, keeps the white PLA
+// from glaring); metals need the full room to read as metal, glossy plastics a little more than PLA.
+const MAT = {
+  tin:     { metalness: 1, roughness: 0.26, env: 1 },  // tinned leads, pads, RF shield, USB shell
+  gold:    { metalness: 1, roughness: 0.2, env: 1 },   // ENIG pads, gold-flashed header pins
+  brass:   { metalness: 1, roughness: 0.3, env: 1 },   // MG90S bushings
+  steel:   { metalness: 1, roughness: 0.34, env: 1 },  // screws, output shafts, terminal screws
+  alu:     { metalness: 1, roughness: 0.4, env: 1 },   // electrolytic can
+  mask:    { metalness: 0, roughness: 0.55, clearcoat: 1, clearcoatRoughness: 0.1, env: 0.85 },  // solder mask over FR4
+  fr4:     { metalness: 0, roughness: 0.75 },               // bare board edge / substrate
+  epoxy:   { metalness: 0, roughness: 0.62, clearcoat: 0.15, clearcoatRoughness: 0.5 },  // IC / resistor bodies
+  ceramic: { metalness: 0, roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4 },
+  nylon:   { metalness: 0, roughness: 0.55, clearcoat: 0.1, clearcoatRoughness: 0.5 },  // headers, terminal blocks
+  case:    { metalness: 0, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08, env: 0.85 }, // moulded servo cases
+  horn:    { metalness: 0, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.35 },
+  label:   { metalness: 0, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.1, env: 0.85 },  // printed stickers
+  pvc:     { metalness: 0, roughness: 0.36, clearcoat: 0.5, clearcoatRoughness: 0.2, env: 0.8 }, // wire jackets
+  lens:    { metalness: 0, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, env: 1 },  // LEDs, sensor windows
 };
+// [path test, { face colour: finish }]: the first rule whose path matches and that names the colour
+// wins (colours match within a few steps, the bake rounds them). Unlisted colours fall to GENERIC.
+const FINISH_RULES = [
+  [/^PCB_ESP32[^/]*\/esp32 /, { '282828': 'mask', fbfaf5: 'tin', '918f8c': 'tin', f4e6a8: 'gold', a1a1a1: 'tin', '121212': 'epoxy' }],
+  [/^PCB_ESP32[^/]*\/COMPOUND$/, { '121212': 'mask', '9a835e': 'fr4', e9ae1e: 'gold', a1a1a1: 'tin' }],
+  [/MicroUSB/, { fbfaf5: 'tin', '282828': 'nylon', f4e6a8: 'gold' }],
+  [/Cap_Tam/, { e9ae1e: 'epoxy', db5858: 'epoxy' }],
+  [/Led_red|SM LED/, { db5858: 'lens', '6dda00': 'lens', ffffff: 'epoxy' }],
+  [/Cap_0603/, { f4e6a8: 'ceramic' }],
+  [/Push_Bottom/, { '121212': 'nylon' }],
+  [/^PCA9685[^/]*\/Board\//, { '0046da': 'mask', e5b375: 'fr4', ebebeb: 'tin' }],
+  [/^PCA9685.*Header/, { '292929': 'nylon', ff0000: 'nylon', ffff00: 'nylon', c89217: 'gold' }],
+  [/^PCA9685.*Terminal Block/, { '558307': 'nylon', d4d4d4: 'steel' }],
+  [/^PCA9685.*Electrolytic/, { '737a81': 'alu', ffffff: 'alu', '292929': 'nylon' }],
+  [/^PCA9685.*Capacitor/, { '8d673a': 'ceramic' }],
+  [/^VL53L0X[^/]*\/1x6/, { ffc000: 'gold' }],
+  [/^VL53L0X[^/]*\/VL53L0X\/COMPOUND$/, { '810081': 'mask', eecfc4: 'fr4' }],
+  [/\(sensor\) v1\/(pcb|top)$/, { '4a7230': 'epoxy', '383838': 'epoxy' }],
+  [/\(sensor\) v1\/kork$/, { '7e6a06': 'lens' }],
+  [/CeramicBody/, { c4b1a0: 'ceramic' }],
+  [/^30100/, { a1a1a1: 'mask', '363636': 'epoxy', c1c1c1: 'tin', ffffff: 'tin', '818181': 'tin', ffffc1: 'lens', ccd3ef: 'lens' }],
+  [/^M90S_ali[^/]*\/base/, { '524d4b': 'case' }],
+  [/^M90S_ali[^/]*\/etiquette/, { '3e3e3e': 'label', ed27ea: 'label', ffffff: 'label' }],
+  [/^M90S_ali[^/]*\/axe$/, { ebebeb: 'steel' }],
+  [/^M90S_ali[^/]*\/MG90S_arm/, { '4b4b4b': 'horn' }],
+  [/^M90S_ali[^/]*\/Cylindre/, { c89217: 'brass' }],
+  [/^M90S_ali[^/]*\/Tube/, { ff0000: 'pvc', ab5400: 'pvc', ffff00: 'pvc' }],
+  [/Tower Pro\.[2346]_/, { ffffff: 'horn', c7c2bd: 'steel' }],
+  [/Tower Pro\.1_/, { '0000ff': 'case', '3e3e3e': 'label', a68500: 'label', ffffff: 'label', c7c2bd: 'steel', ff0000: 'pvc', ff8d00: 'pvc', '8d5c02': 'pvc' }],
+];
+const GENERIC = { fbfaf5: 'tin', f6f6f3: 'tin', ebebeb: 'tin', cdcdcd: 'tin', bfbfbf: 'tin', c1c1c1: 'tin', ffffff: 'tin',
+  f4e6a8: 'gold', c89217: 'gold', '121212': 'epoxy', '131313': 'epoxy', '232323': 'epoxy', '292929': 'epoxy', '3e3e3e': 'epoxy' };
+const near = (map, rgb) => {
+  for (const k in map) {
+    const h = parseInt(k, 16);
+    if (Math.max(Math.abs((h >> 16) - (rgb >> 16)), Math.abs(((h >> 8) & 255) - ((rgb >> 8) & 255)), Math.abs((h & 255) - (rgb & 255))) <= 6) return map[k];
+  }
+};
+function finishOf(path, rgb) {
+  for (const [re, map] of FINISH_RULES) if (re.test(path)) { const f = near(map, rgb); if (f) return f; }
+  return near(GENERIC, rgb) || 'nylon';
+}
+// Split a mesh's triangles by finish (face colour → finishOf). Returns [[finish, geometry], …].
+function splitByFinish(geo, path) {
+  const col = geo.attributes.color, idx = geo.index, n = idx ? idx.count : geo.attributes.position.count;
+  const c = new THREE.Color(), memo = new Map(), tris = new Map();
+  for (let t = 0; t < n; t += 3) {
+    const v = idx ? idx.getX(t) : t;
+    const key = col ? c.setRGB(col.getX(v), col.getY(v), col.getZ(v), THREE.LinearSRGBColorSpace).getHex() : -1;
+    let f = memo.get(key);
+    if (f === undefined) memo.set(key, f = col ? finishOf(path, key) : 'nylon');
+    if (!tris.has(f)) tris.set(f, []);
+    tris.get(f).push(t);
+  }
+  // whole meshes pass through as-is, unless they hold interleaved (quantized) attributes: a split
+  // copy gets plain ones, and mergeGeometries refuses to mix the two kinds
+  const interleaved = Object.values(geo.attributes).some((a) => a.isInterleavedBufferAttribute);
+  if (tris.size === 1 && !interleaved) return [[tris.keys().next().value, geo]];
+  return [...tris].map(([f, ts]) => {
+    const remap = new Map(), index = [];
+    for (const t of ts) for (let k = 0; k < 3; k++) {
+      const v = idx ? idx.getX(t + k) : t + k;
+      if (!remap.has(v)) remap.set(v, remap.size);
+      index.push(remap.get(v));
+    }
+    const g = new THREE.BufferGeometry();
+    for (const [name, a] of Object.entries(geo.attributes)) {
+      const b = new THREE.BufferAttribute(new a.array.constructor(remap.size * a.itemSize), a.itemSize, a.normalized);
+      for (const [s, d] of remap) for (let i = 0; i < a.itemSize; i++) b.setComponent(d, i, a.getComponent(s, i));
+      g.setAttribute(name, b);
+    }
+    g.setIndex(index);
+    return [f, g];
+  });
+}
+function finishMaterial(f, opts = { vertexColors: true, side: THREE.DoubleSide }) {
+  const { env, ...rest } = f;
+  return new THREE.MeshPhysicalMaterial({ ...opts, ...rest,
+    ...(env ? { envMap: scene.environment, envMapIntensity: env } : {}) });
+}
 // ---------- How-it-works tour ----------
 // Based on headset_esp32.ino v3.4.
 const TOUR = [
@@ -586,21 +662,21 @@ function onModel(gltf) {
   for (const p of PARTS) {
     p.objs = [];
     const box = new THREE.Box3();
-    // One draw call per surface finish: a part's meshes that share a material are merged
-    // (e.g. the TP4057's 94 solids become a handful of meshes). Looks the same, far fewer draws.
+    // One draw call per surface finish: every face of the part with the same finish is merged
+    // (the ESP32 board's ~900 solids become a handful of meshes). Looks the same, far fewer draws.
     const byFinish = new Map();
     const over = p.finish;
     const horns = p.horns ? p.srcs.filter((m) => HORNS[p.horns].parts.test(pathOf(m))) : [];
     for (const src of p.srcs) {
       if (horns.includes(src)) continue;
-      const hex = (src.userData && src.userData.c) || '';
-      const key = over ? 'part' : hex;
-      if (!byFinish.has(key)) byFinish.set(key, { f: { ...(FINISH[hex] || { metalness: 0, roughness: 0.5 }), ...(over || {}) }, geos: [] });
-      byFinish.get(key).geos.push(src.geometry);
+      for (const [key, geo] of over ? [['part', src.geometry]] : splitByFinish(src.geometry, pathOf(src))) {
+        if (!byFinish.has(key)) byFinish.set(key, { f: over || MAT[key], geos: [] });
+        byFinish.get(key).geos.push(geo);
+      }
     }
     for (const { f, geos } of byFinish.values()) {
       const geo = geos.length > 1 ? mergeGeometries(geos) : geos[0];
-      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 1, ...f }));
+      const m = new THREE.Mesh(geo, finishMaterial(f));
       m.castShadow = true; m.receiveShadow = true;
       m.geometry.computeBoundingBox();
       box.union(m.geometry.boundingBox);
@@ -616,7 +692,7 @@ function onModel(gltf) {
       meshParts.set(m, p);
     }
     if (horns.length) buildHorns(p, horns, box);
-    p.holders = p.objs.map((m) => m.userData.holder || m.parent);
+    p.holders = [...new Set(p.objs.map((m) => m.userData.holder || m.parent))];
     partBoxes[p.id] = box;
     if (p.anchor === 'one' && p.srcs.length) {
       // one box per physical unit (e.g. each of the 4 film sensors): merge source meshes that touch
@@ -674,17 +750,25 @@ function buildHorns(p, srcs, box) {
   p.hornUnits = {};
   for (const [key, list] of units) {
     const { axis, centre } = mainAxis(list.filter((m) => h.axis.test(m.userData.path)).map((m) => m.geometry));
-    const mesh = new THREE.Mesh(mergeGeometries(list.map((m) => m.geometry)),
-      new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0.2, roughness: 0.45 }));
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    mesh.position.copy(centre).negate();
-    mesh.geometry.computeBoundingBox(); box.union(mesh.geometry.boundingBox);
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 32), new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
-    edges.raycast = () => {}; mesh.add(edges); mesh.userData.edges = edges;
     const pivot = new THREE.Group(), holder = new THREE.Group();
-    pivot.position.copy(centre); pivot.add(mesh); holder.add(pivot); root.add(holder);
-    mesh.userData.holder = holder;
-    p.objs.push(mesh); meshParts.set(mesh, p);
+    pivot.position.copy(centre); holder.add(pivot); root.add(holder);
+    // one mesh per finish (steel shaft / plastic arm / screw), all turning on the same pivot
+    const byFinish = new Map();
+    for (const m of list) for (const [f, geo] of splitByFinish(m.geometry, m.userData.path)) {
+      if (!byFinish.has(f)) byFinish.set(f, []);
+      byFinish.get(f).push(geo);
+    }
+    for (const [f, geos] of byFinish) {
+      const mesh = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], finishMaterial(MAT[f]));
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.copy(centre).negate();
+      mesh.geometry.computeBoundingBox(); box.union(mesh.geometry.boundingBox);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 32), new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
+      edges.raycast = () => {}; mesh.add(edges); mesh.userData.edges = edges;
+      pivot.add(mesh);
+      mesh.userData.holder = holder;
+      p.objs.push(mesh); meshParts.set(mesh, p);
+    }
     p.hornUnits[key] = { pivot, axis };
   }
 }
@@ -787,7 +871,7 @@ function buildCables() {
   const edges = () => { const e = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ transparent: true })); e.visible = false; return e; };
   p.objs = [...WIRE_COLS, 0x1b1b1b].map((col, k) => {
     const m = new THREE.Mesh(k < 3 ? new THREE.BufferGeometry() : mergeGeometries(boxes),
-      new THREE.MeshPhysicalMaterial({ color: col, roughness: k < 3 ? 0.45 : 0.6, clearcoat: k < 3 ? 0.3 : 0 }));
+      finishMaterial(k < 3 ? MAT.pvc : MAT.nylon, { color: col }));
     m.castShadow = true; m.receiveShadow = true;
     m.userData.edges = edges(); m.add(m.userData.edges);
     root.add(m); meshParts.set(m, p);

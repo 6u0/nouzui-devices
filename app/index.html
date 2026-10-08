@@ -312,13 +312,13 @@ const PARTS = [
     spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9002）'], ['入力', 'ホール GPIO10 / 圧力 GPIO1–4 / ボタン GPIO11'], ['出力', '振動PWM GPIO8・GPIO7 / LED 赤 GPIO0・緑 GPIO43'], ['監視', 'LiPo電圧 GPIO5 / 充電中 GPIO6'], ['内蔵IMU', '衝撃検知（フェーズ4）'], ['ボタン', '1回: 画面切替 / 2回: 充電専用モード / 10秒長押し: 電源OFF']] },
   { id: 'screws', ref: 'S1', name: 'M2キャップスクリュー ×2', en: 'M2 cap screw 8mm', sel: /M2 cap screw/, layer: 0.4,
     desc: '内部部品を固定するM2のネジ（長さ8mm）。', spec: [['規格', 'M2 × 8mm']] },
-  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'lipo battery', sel: /lipo battery$/, finish: { metalness: 0.55, roughness: 0.32 }, layer: 1, sub: '電源（GPIO5で電圧監視）',
+  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'lipo battery', sel: /lipo battery$/, finish: { metalness: 0.55, roughness: 0.32, env: 1 }, layer: 1, sub: '電源（GPIO5で電圧監視）',
     desc: 'M5StickS3本体とは別の充電式リチウムポリマー電池。電圧はM5StickS3が常に監視していて、1秒ごとにPCへ送られます。', spec: [['電圧監視', 'GPIO5（1/2に分圧して読み、×2で復元・10回平均）'], ['低残量', '3.55 V 未満で赤LED点滅'], ['PCへ送信', '/battery/lipo（1秒ごと）'], ['外形', '約 8 × 34 × 20 mm']] },
   { id: 'hallcase', ref: 'H2', name: 'ホールセンサーケース', en: 'hall_sensor_case', sel: /^hall_sensor_case$/, layer: 1.3, ghost: false,
     desc: 'ホールセンサーまわりを保持する縦向きの樹脂パーツ。', spec: [['材質', '3Dプリント樹脂']] },
   { id: 'socket', ref: 'J1', name: '8ピンソケット', en: 'pinsocket_8', sub: 'M5StickS3との接続', sel: /pinsocket_8/, layer: 1.6,
     desc: 'M5StickS3のピンヘッダを受けるソケット。ここから内部の基板やセンサーへ信号がつながります。', spec: [['ピン数', '8']] },
-  { id: 'vibrator', ref: 'M1', name: '振動モーター', en: 'vibrator', sel: /(^|\/)vibrator$/, finish: { metalness: 0.9, roughness: 0.25 }, layer: 2, sub: '出力（心拍パターン）',
+  { id: 'vibrator', ref: 'M1', name: '振動モーター', en: 'vibrator', sel: /(^|\/)vibrator$/, finish: { metalness: 0.9, roughness: 0.25, env: 1 }, layer: 2, sub: '出力（心拍パターン）',
     desc: 'DRV8833から電流を受けて回る振動モーター。PCから /heartrate を受け取るたびに、心拍のような約0.33秒の振動を1回出します。', spec: [['波形', '0→220→220→130→40→80→0（PWM値 / 255）'], ['長さ', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
   { id: 'chargerbase', ref: 'H3', name: '充電モジュール台座', en: 'charger_substrare', sel: /charger_substrare$/, layer: 2,
     desc: '充電モジュールを載せるための台座パーツ。', spec: [['材質', '3Dプリント樹脂']] },
@@ -355,32 +355,107 @@ const LAYER_GAP = 12;      // mm per layer at 100%
 const CLEARANCE = 8;       // mm between stacked groups at 100%
 const COVER_LIFT = 10;     // mm the base cover rises in stage 1
 
-// Surface finish by original STEP colour
-const FINISH = {
-  f3cb7c: { metalness: 1, roughness: 0.26 },      // gold-plated pins / pads
-  f4e5a7: { metalness: 1, roughness: 0.3 },
-  d1ccc0: { metalness: 0.9, roughness: 0.3 },     // tin / steel
-  cbcbcb: { metalness: 0.95, roughness: 0.28 },   // screws
-  ffffff: { metalness: 0.85, roughness: 0.3 },
-  f6f6f3: { metalness: 0.8, roughness: 0.32 },
-  cbcbad: { metalness: 0, roughness: 0.55 },      // grove socket plastic
-  b39657: { metalness: 0, roughness: 0.5 },       // ceramic
-  191919: { metalness: 0, roughness: 0.32, clearcoat: 0.4 },
-  434343: { metalness: 0, roughness: 0.45 },
-  cad1ee: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // PCB w/ solder mask
-  f7e9d1: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 },
-  db620b: { metalness: 0, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 }, // M5 body
-  a0a0a0: { metalness: 0, roughness: 0.72 },  // printed parts
-  '3f3f3f': { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 }, // printed carbon shell
-  e5e8e5: { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 },   // PET film
-  '212124': { metalness: 0, roughness: 0.75 },                   // carbon ink
-  d1d1cc: { metalness: 0.9, roughness: 0.35 },                   // silver electrode
-  bfc2c7: { metalness: 0.95, roughness: 0.28 },                  // crimp terminal
-  b8bac2: { metalness: 0.95, roughness: 0.28 },                  // terminal pin
-  f7f7f5: { metalness: 0, roughness: 0.6 },                      // white stiffener
-  c4c5c4: { metalness: 0.9, roughness: 0.3 },                    // KY-003 pins
-  '404040': { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // KY-003 PCB
+// Surface finish per CAD face colour. The STEP gives each face its own colour (baked into the vertex
+// colours), and one solid often mixes materials (a resistor = black film + ceramic body + tinned
+// end caps), so each mesh is split by face colour at load and every piece gets its real finish.
+// env: reflection strength. Set per material (scene.environmentIntensity, 0.55, keeps the gel and
+// printed parts soft); metals need the full room to read as metal, glossy plastics a little more.
+const MAT = {
+  tin:     { metalness: 1, roughness: 0.26, env: 1 },  // tinned leads, pads, RF shield, USB shell
+  gold:    { metalness: 1, roughness: 0.2, env: 1 },   // ENIG pads, gold-flashed header pins
+  brass:   { metalness: 1, roughness: 0.3, env: 1 },   // MG90S bushings
+  steel:   { metalness: 1, roughness: 0.34, env: 1 },  // screws, output shafts, terminal screws
+  alu:     { metalness: 1, roughness: 0.4, env: 1 },   // electrolytic can
+  mask:    { metalness: 0, roughness: 0.55, clearcoat: 1, clearcoatRoughness: 0.1, env: 0.85 },  // solder mask over FR4
+  fr4:     { metalness: 0, roughness: 0.75 },               // bare board edge / substrate
+  epoxy:   { metalness: 0, roughness: 0.62, clearcoat: 0.15, clearcoatRoughness: 0.5 },  // IC / resistor bodies
+  ceramic: { metalness: 0, roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4 },
+  nylon:   { metalness: 0, roughness: 0.55, clearcoat: 0.1, clearcoatRoughness: 0.5 },  // headers, terminal blocks
+  case:    { metalness: 0, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08, env: 0.85 }, // moulded servo cases
+  horn:    { metalness: 0, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.35 },
+  label:   { metalness: 0, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.1, env: 0.85 },  // printed stickers
+  pvc:     { metalness: 0, roughness: 0.36, clearcoat: 0.5, clearcoatRoughness: 0.2, env: 0.8 }, // wire jackets
+  lens:    { metalness: 0, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, env: 1 },  // LEDs, sensor windows
+  m5:      { metalness: 0, roughness: 0.38, clearcoat: 0.7, clearcoatRoughness: 0.2, env: 0.85 },  // M5StickS3 body
+  printed: { metalness: 0, roughness: 0.72 },               // printed inner cases
+  carbon:  { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 },  // printed carbon shell / arms
+  film:    { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15, env: 0.85 },  // PET film
+  ink:     { metalness: 0, roughness: 0.75 },               // carbon ink
+  silver:  { metalness: 1, roughness: 0.38, env: 1 },       // printed silver electrode
+  matte:   { metalness: 0, roughness: 0.6 },                // white stiffener
 };
+// [path test, { face colour: finish }]: the first rule whose path matches and that names the colour
+// wins (colours match within a few steps, the bake rounds them). Unlisted colours fall to GENERIC.
+const FINISH_RULES = [
+  [/^M5StickC[^/]*\/M5StickC v14\/COMPOUND$/, { '3d4350': 'm5', '121212': 'case', f3cc7d: 'gold' }],
+  [/Grove socket/, { ccccae: 'nylon', d2cdc1: 'tin' }],
+  [/M2 cap screw/, { cccccc: 'steel' }],
+  [/pinsocket|USB C|\/Mold$/, { '121212': 'nylon', '414141': 'nylon', f3cc7d: 'gold', ffffff: 'tin' }],
+  [/HRO_TYPE-C/, { f4e6a8: 'gold', d2cdc1: 'tin' }],
+  [/^Charging[^/]*\/COMPOUND$/, { f7ead2: 'mask', '121212': 'epoxy' }],
+  [/LED 0603/, { '00ff00': 'lens', ff0000: 'lens', ffffff: 'epoxy', c5c5c5: 'tin', f3cc7d: 'gold' }],
+  [/\/R0[46]0[23] v/, { '4b4b4b': 'epoxy', a59e9a: 'ceramic' }],
+  [/CeramicBody/, { b49756: 'ceramic' }],
+  [/^DRV8833/, { '060606': 'mask', '919191': 'fr4', ffffff: 'tin', cbd2ef: 'tin', f0f0f0: 'tin', '7b7b7b': 'epoxy', '2a2a2a': 'epoxy', '0d0d0d': 'epoxy',
+    a28b0b: 'ceramic', '846e06': 'ceramic', '907a06': 'ceramic', '2e2501': 'ceramic', ff4e0d: 'lens' }],
+  [/^KY-003/, { '3e3e3e': 'mask', '222222': 'nylon', f5f5f6: 'tin', c5c6c5: 'tin', a1a1a1: 'epoxy', f0e502: 'ceramic' }],
+  [/carbon_ink/, { '1b1b1f': 'ink' }],
+  [/pet_film/, { e6e9e6: 'film' }],
+  [/silver_electrode/, { d2d2cd: 'silver' }],
+  [/crimp_|\/pin_/, { c0c3c8: 'steel', b9bbc3: 'steel' }],
+  [/stiffener_white/, { f7f7f5: 'matte' }],
+  [/^(shell|arm1|arm2)$/, { '3d3d3d': 'carbon' }],
+  [/^(diver_case|hall_sensor_case)$|charger_substrare$/, { a1a1a1: 'printed' }],
+];
+const GENERIC = { f6f6f3: 'tin', ffffff: 'tin', c5c5c5: 'tin', f3cc7d: 'gold', f4e6a8: 'gold', '121212': 'epoxy' };
+const near = (map, rgb) => {
+  for (const k in map) {
+    const h = parseInt(k, 16);
+    if (Math.max(Math.abs((h >> 16) - (rgb >> 16)), Math.abs(((h >> 8) & 255) - ((rgb >> 8) & 255)), Math.abs((h & 255) - (rgb & 255))) <= 6) return map[k];
+  }
+};
+function finishOf(path, rgb) {
+  for (const [re, map] of FINISH_RULES) if (re.test(path)) { const f = near(map, rgb); if (f) return f; }
+  return near(GENERIC, rgb) || 'nylon';
+}
+// Split a mesh's triangles by finish (face colour → finishOf). Returns [[finish, geometry], …].
+function splitByFinish(geo, path) {
+  const col = geo.attributes.color, idx = geo.index, n = idx ? idx.count : geo.attributes.position.count;
+  const c = new THREE.Color(), memo = new Map(), tris = new Map();
+  for (let t = 0; t < n; t += 3) {
+    const v = idx ? idx.getX(t) : t;
+    const key = col ? c.setRGB(col.getX(v), col.getY(v), col.getZ(v), THREE.LinearSRGBColorSpace).getHex() : -1;
+    let f = memo.get(key);
+    if (f === undefined) memo.set(key, f = col ? finishOf(path, key) : 'nylon');
+    if (!tris.has(f)) tris.set(f, []);
+    tris.get(f).push(t);
+  }
+  // whole meshes pass through as-is, unless they hold interleaved (quantized) attributes: a split
+  // copy gets plain ones, and mergeGeometries refuses to mix the two kinds
+  const interleaved = Object.values(geo.attributes).some((a) => a.isInterleavedBufferAttribute);
+  if (tris.size === 1 && !interleaved) return [[tris.keys().next().value, geo]];
+  return [...tris].map(([f, ts]) => {
+    const remap = new Map(), index = [];
+    for (const t of ts) for (let k = 0; k < 3; k++) {
+      const v = idx ? idx.getX(t + k) : t + k;
+      if (!remap.has(v)) remap.set(v, remap.size);
+      index.push(remap.get(v));
+    }
+    const g = new THREE.BufferGeometry();
+    for (const [name, a] of Object.entries(geo.attributes)) {
+      const b = new THREE.BufferAttribute(new a.array.constructor(remap.size * a.itemSize), a.itemSize, a.normalized);
+      for (const [s, d] of remap) for (let i = 0; i < a.itemSize; i++) b.setComponent(d, i, a.getComponent(s, i));
+      g.setAttribute(name, b);
+    }
+    g.setIndex(index);
+    return [f, g];
+  });
+}
+function finishMaterial(f, opts = { vertexColors: true, side: THREE.DoubleSide }) {
+  const { env, ...rest } = f;
+  return new THREE.MeshPhysicalMaterial({ ...opts, ...rest,
+    ...(env ? { envMap: scene.environment, envMapIntensity: env } : {}) });
+}
 // soft urethane gel, painted and glossed like the real piece: satin paint under a wet clear coat
 const GEL = { metalness: 0, roughness: 0.58, clearcoat: 1, clearcoatRoughness: 0.1, sheen: 0.2, sheenRoughness: 0.5, sheenColor: 0xff7a7a };
 
@@ -643,20 +718,20 @@ function onModel(gltf) {
   for (const p of PARTS) {
     p.objs = [];
     const box = new THREE.Box3();
-    // One draw call per surface finish: a part's meshes that share a material are merged
+    // One draw call per surface finish: every face of the part with the same finish is merged
     // (e.g. the TP4057's 94 solids become a handful of meshes). Looks the same, far fewer draws.
     const byFinish = new Map();
     const over = p.finish === 'gel' ? GEL : p.finish;
     for (const src of p.srcs) {
-      const hex = (src.userData && src.userData.c) || '';
       if (p.paint) paintGel(src.geometry, p.paint);
-      const key = over ? 'part' : hex;
-      if (!byFinish.has(key)) byFinish.set(key, { f: { ...(FINISH[hex] || { metalness: 0, roughness: 0.5 }), ...(over || {}) }, geos: [] });
-      byFinish.get(key).geos.push(src.geometry);
+      for (const [key, geo] of over ? [['part', src.geometry]] : splitByFinish(src.geometry, pathOf(src))) {
+        if (!byFinish.has(key)) byFinish.set(key, { f: over || MAT[key], geos: [] });
+        byFinish.get(key).geos.push(geo);
+      }
     }
     for (const { f, geos } of byFinish.values()) {
       const geo = geos.length > 1 ? mergeGeometries(geos) : geos[0];
-      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 1, ...f }));
+      const m = new THREE.Mesh(geo, finishMaterial(f));
       m.castShadow = true; m.receiveShadow = true;
       m.geometry.computeBoundingBox();
       box.union(m.geometry.boundingBox);
