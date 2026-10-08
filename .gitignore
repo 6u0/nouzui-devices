@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# conversion intermediates (rebuilt by `npm run convert`)
+raw.json
+step-colors.json
+match-report.txt

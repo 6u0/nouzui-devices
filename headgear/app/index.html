@@ -1,0 +1,1492 @@
+<title>Headgear Inside</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- scope "/" in the manifest keeps both pages inside the installed app (PWA), whichever way the
+     folder is served; without it the scope is just this page's folder and the other page opens
+     outside the app -->
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* Layout: Apple Liquid Glass (iOS/iPadOS 26-27). The 3D model is the content layer on a soft
+   studio backdrop; every control floats above it as glass: a left-aligned Large Title, a capsule
+   segmented control top-right, a vertical capsule slider, one grouped toolbar, a glass card.
+   Shapes are concentric (outer radius = inner radius + padding); controls are capsules.
+   Type is the system font: SF Pro + Hiragino Sans (ja) / PingFang TC (zh) on Apple devices. */
+:root {
+  --bg-top: #f5f5f7;
+  --bg-bottom: #e8e8ed;
+  --label: #000000;                       /* iOS label */
+  --label-2: rgba(60, 60, 67, 0.6);       /* secondaryLabel */
+  --label-3: rgba(60, 60, 67, 0.3);       /* tertiaryLabel */
+  --separator: rgba(60, 60, 67, 0.18);
+  --fill: rgba(120, 120, 128, 0.16);      /* systemFill-ish track */
+  --accent: #0088ff;                      /* systemBlue (iOS 26 tuning) */
+  --accent-ink: #ffffff;
+  --glass: rgba(255, 255, 255, 0.62);     /* iOS 27 default: a little less clear than 26 */
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
+             "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --r-panel: 26px;  /* outer; inner rows use 26 - 8 = 18 */
+  color-scheme: light;
+}
+html[lang="zh-Hant"] {
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Heiti TC",
+             "Microsoft JhengHei UI", system-ui, sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--label); font-family: var(--font-ui);
+  font-size: 17px; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+  background:
+    radial-gradient(60% 50% at 70% 20%, rgba(0, 136, 255, 0.07), transparent 70%),
+    radial-gradient(50% 45% at 15% 85%, rgba(255, 149, 0, 0.05), transparent 70%),
+    radial-gradient(90% 80% at 45% 45%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+button { font-family: inherit; color: inherit; letter-spacing: inherit; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+
+/* ---- Liquid Glass material ---- */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(190%); backdrop-filter: blur(22px) saturate(190%);
+  border: 0.5px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -0.5px 0 rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+/* only the larger surfaces catch the light (iOS 27): a soft specular rim along the top edge */
+.glass.lit::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 38%);
+  mix-blend-mode: soft-light;
+}
+/* when the WebGL lens is drawing the glass, the DOM panes only carry text and controls */
+body.gl-glass .glass { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: transparent; box-shadow: none; }
+body.gl-glass .glass.lit::before { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .glass { background: #f9f9fb; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+#leaders { position: fixed; inset: 0; pointer-events: none; overflow: visible; }
+#leaders path { fill: none; stroke: rgba(60, 60, 67, 0.55); stroke-width: 1; }
+#leaders circle { fill: #ffffff; stroke: var(--accent); stroke-width: 2.5; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+.callout {
+  position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: baseline;
+  padding: 7px 14px 8px; border-radius: 16px; white-space: nowrap;
+}
+.callout .ref { font: 600 12px/1 var(--font-mono); color: var(--label-2); }
+.callout b { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.callout small { grid-column: 2; font-size: 12px; color: var(--label-2); margin-top: 1px; }
+.callout.is-on { box-shadow: var(--glass-shadow), 0 0 0 2px var(--accent); }
+
+/* Large Title, left-aligned, straight on the content like a navigation title */
+.titleblock {
+  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); left: 24px;
+  display: grid; gap: 2px; pointer-events: none;
+}
+.titleblock .eyebrow { font-size: 13px; font-weight: 600; color: var(--label-2); letter-spacing: 0; text-transform: uppercase; }
+.titleblock h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.titleblock .eyebrow-row { display: flex; align-items: center; gap: 10px; }
+.titleblock .sibling { pointer-events: auto; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.titleblock .sibling:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+.titleblock .dims { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+/* capsule segmented control */
+.modes {
+  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); right: 18px;
+  display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+}
+.modes button {
+  border: 0; background: transparent; font-size: 15px; font-weight: 600;
+  min-height: 38px; padding: 0 20px; border-radius: 999px; cursor: pointer;
+  transition: background-color .25s, box-shadow .25s, color .25s;
+}
+.modes button[aria-pressed="true"] { background: #ffffff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08); }
+.modes.langs { top: calc(70px + env(safe-area-inset-top, 0px)); }
+.modes.langs button { min-height: 30px; padding: 0 13px; font-size: 13px; }
+
+/* vertical capsule slider; the thumb turns to clear glass while dragging */
+.rail {
+  position: fixed; right: 18px; top: 50%; transform: translateY(-44%);
+  width: 64px; height: min(52vh, 420px); display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
+  justify-items: center; padding: 14px 0; border-radius: 32px;
+}
+.rail .cap { font-size: 13px; font-weight: 600; color: var(--label-2); text-align: center; line-height: 1.25; }
+.rail .readout { font-size: 13px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.rail .readout br + * { color: var(--label-2); }
+.track { position: relative; width: 44px; height: calc(100% - 44px); margin: 22px 0; touch-action: none; cursor: ns-resize; }
+.track::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; transform: translateX(-50%); border-radius: 3px; background: var(--fill); }
+.track .fill { position: absolute; left: 50%; bottom: 0; width: 6px; transform: translateX(-50%); border-radius: 3px; background: var(--accent); }
+.track .tick { display: none; }
+.track .thumb {
+  position: absolute; left: 50%; width: 30px; height: 40px; transform: translate(-50%, 50%);
+  border-radius: 999px; background: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16), 0 0.5px 2px rgba(0, 0, 0, 0.12);
+  transition: transform .2s, background-color .2s, width .2s, height .2s;
+}
+.track .thumb svg { display: none; }
+.track.dragging .thumb {
+  width: 38px; height: 52px; background: rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: blur(2px) saturate(160%); backdrop-filter: blur(2px) saturate(160%);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.9), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+}
+.track:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 4px; border-radius: 22px; }
+
+/* one grouped toolbar, text buttons only */
+.tools {
+  position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; max-width: calc(100vw - 120px);
+}
+.chip {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px;
+  font-size: 15px; font-weight: 600; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
+  transition: background-color .2s, color .2s;
+}
+.chip .dot { display: none; }
+.chip[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.chip:active, .modes button:active, .steps button:active, .tour .nav button:active { transform: scale(0.97); }
+.chip:focus-visible, .modes button:focus-visible, .steps button:focus-visible, .tour .nav button:focus-visible, .sheet .close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px;
+}
+
+/* glass card */
+.sheet {
+  position: fixed; right: 100px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: min(370px, calc(100vw - 136px)); padding: 18px 18px 10px; border-radius: var(--r-panel);
+  display: grid; gap: 6px;
+}
+.sheet .ref { font: 600 12px/1.2 var(--font-mono); color: var(--label-2); }
+.sheet h2 { margin: 0; padding-right: 36px; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.sheet p { margin: 2px 0 6px; font-size: 15px; line-height: 1.55; color: rgba(0, 0, 0, 0.85); }
+.sheet dl { margin: 0 -8px; padding: 2px 12px; display: grid; grid-template-columns: auto 1fr; border-radius: 18px; background: rgba(255, 255, 255, 0.55); font-size: 13px; }
+.sheet dt, .sheet dd { padding: 9px 0; border-bottom: 0.5px solid var(--separator); }
+.sheet dt:last-of-type, .sheet dd:last-of-type { border-bottom: 0; }
+.sheet dt { padding-right: 14px; color: var(--label-2); font-weight: 500; }
+.sheet dd { margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+.sheet .close {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: var(--fill); color: var(--label-2); display: grid; place-items: center; cursor: pointer; font-size: 0;
+}
+.sheet .close::before, .sheet .close::after { content: ""; position: absolute; width: 12px; height: 2px; border-radius: 1px; background: currentColor; }
+.sheet .close::before { transform: rotate(45deg); }
+.sheet .close::after { transform: rotate(-45deg); }
+
+/* how-it-works panel: a sidebar-style list + text */
+.tour {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: min(640px, calc(100vw - 36px)); padding: 8px 8px 12px; border-radius: var(--r-panel); display: grid; gap: 8px;
+}
+.steps { display: flex; gap: 2px; overflow-x: auto; }
+.steps button {
+  flex: 1 0 auto; min-height: 40px; padding: 0 12px; border: 0; border-radius: 18px; background: transparent;
+  font-size: 15px; font-weight: 500; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px;
+}
+.steps button span {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--fill); color: var(--label-2); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.steps button[aria-current="step"] { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); font-weight: 600; }
+.steps button[aria-current="step"] span { background: var(--accent); color: var(--accent-ink); }
+.tour h2, .tour .flowkey, .tour p { margin: 0 10px; }
+.tour h2 { margin-top: 6px; font-size: 20px; line-height: 25px; font-weight: 700; letter-spacing: -0.01em; }
+.tour .flowkey { font: 500 12px/1.45 var(--font-mono); color: var(--accent); }
+.tour p { font-size: 15px; line-height: 1.6; color: rgba(0, 0, 0, 0.85); max-width: 62ch; }
+.demo { margin: 4px 10px 0; padding: 10px 12px; border-radius: 18px; background: rgba(255, 255, 255, 0.55); display: grid; gap: 8px; }
+.demo .demo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: var(--label-2); }
+.demo .chip { min-height: 30px; padding: 0 12px; font-size: 13px; }
+.demo .sliders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
+.demo label { display: grid; grid-template-columns: 2.2em minmax(0, 1fr) 4.6em; align-items: center; gap: 6px; font: 600 12px/1.2 var(--font-mono); color: var(--label-2); }
+.demo input[type=range] { width: 100%; accent-color: var(--accent); touch-action: none; }
+.demo output { text-align: right; font-variant-numeric: tabular-nums; color: var(--label); }
+.demo .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.demo .send { min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; font-size: 14px; font-weight: 600; cursor: pointer; background: var(--accent); color: var(--accent-ink); }
+.demo .send.secondary { background: var(--fill); color: var(--label); }
+.demo .note { font-size: 12px; color: var(--label-2); }
+.tour .nav { display: flex; justify-content: space-between; gap: 8px; margin: 6px 4px 0; }
+.tour .nav button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--fill); }
+.tour .nav #tour-next { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+.loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--label-2); pointer-events: none; }
+
+body.touring .tools, body.touring .sheet { display: none; }
+@media (min-width: 900px) {
+  .tour { left: 18px; transform: none; top: calc(112px + env(safe-area-inset-top, 0px)); bottom: auto; width: 320px; }
+  .steps { flex-direction: column; }
+  .steps button { flex: none; }
+}
+@media (max-width: 899px) {
+  /* card sits above the toolbar instead of beside it */
+  .sheet { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 700px) {
+  .titleblock { left: 18px; }
+  .titleblock h1 { font-size: 28px; line-height: 34px; }
+  .rail { height: 40vh; width: 56px; right: 12px; }
+  .sheet { right: 16px; left: 16px; width: auto; bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  .modes { top: auto; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); right: 16px; }
+  .modes.langs { top: calc(18px + env(safe-area-inset-top, 0px)); bottom: auto; }
+  .tools { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); left: 16px; }
+  .tour { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="stage" data-i18n-aria="stage" aria-label="ヘッドギアの3Dモデル。ドラッグで回転、ピンチで拡大"></div>
+<svg id="leaders" aria-hidden="true"></svg>
+<div id="labels"></div>
+<div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
+
+<header class="titleblock">
+  <div class="eyebrow-row"><span class="eyebrow">Headgear · v3.4</span><a class="sibling" href="../" data-local="../ ../../app/" data-artifact="https://claude.ai/artifact/WoLULHZCEYWqHDiaMPRuN3" data-i18n="sibling">脳デバイスへ →</a></div>
+  <h1 data-i18n="title">ヘッドギアの中身</h1>
+  <span class="dims">171.7 × 297.6 × 235.2 mm · 1244 solids</span>
+</header>
+
+<nav class="modes glass" data-i18n-aria="modes" aria-label="表示モード">
+  <button id="mode-explore" aria-pressed="true" data-i18n="explore">観察</button>
+  <button id="mode-tour" aria-pressed="false" data-i18n="tour">しくみ</button>
+</nav>
+
+<nav class="modes langs glass" aria-label="言語 / 語言">
+  <button id="lang-ja" aria-pressed="true" lang="ja">日本語</button>
+  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
+</nav>
+
+<div class="rail glass lit">
+  <div class="cap"><span data-i18n="explode">分解</span></div>
+  <div class="track" id="track" role="slider" tabindex="0" data-i18n-aria="track" aria-label="高さ方向の分解量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="fill" id="fill"></div>
+    <div class="thumb" id="thumb"></div>
+  </div>
+  <div class="readout" id="readout">+0<br>mm</div>
+</div>
+
+<div class="tools glass" id="tools">
+  <button class="chip" id="t-ghost" aria-pressed="false"><span class="dot"></span><span data-i18n="ghost">外装を透かす</span></button>
+  <button class="chip" id="t-spin" aria-pressed="true"><span class="dot"></span><span data-i18n="spin">自動回転</span></button>
+  <button class="chip" id="t-reset" data-i18n="reset">視点を戻す</button>
+</div>
+
+<aside class="sheet glass lit" id="sheet" hidden>
+  <button class="close" id="sheet-close" data-i18n-aria="close" aria-label="閉じる">×</button>
+  <span class="ref" id="s-ref"></span>
+  <h2 id="s-name"></h2>
+  <p id="s-desc"></p>
+  <dl id="s-spec"></dl>
+</aside>
+
+<section class="tour glass lit" id="tour" hidden>
+  <div class="steps" id="steps"></div>
+  <h2 id="tour-title"></h2>
+  <span class="flowkey" id="tour-flow"></span>
+  <p id="tour-text"></p>
+  <div class="demo" id="tour-demo" hidden></div>
+  <div class="nav"><button id="tour-prev" data-i18n="prev">← 前へ</button><button id="tour-next" data-i18n="next">次へ →</button></div>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------- Part catalogue ----------
+// sel: matched against each mesh's CAD assembly path (extras.path from to-glb.js, e.g.
+// "M90S_ali#3/base001"); where: optional test on the mesh's centre (mm, model coordinates, z up,
+// +y = back of the head) for the unnamed printed bodies. A mesh goes to the first part that takes it.
+// Meshes no part claims are listed in the console after loading.
+// level: explode floor, from the bottom up (see computeRises); layer: extra rise inside a floor
+// anchor: 'one' = several separate units (the 6 servos): one leader dot, one signal line per unit
+// cables: drawn by buildCables() — the servo leads are not in the CAD
+const FRONT = (c) => c.y < -25;  // the stand and the mirror servo sit in front of the face
+// every printed part is white PLA Basic: ignore the CAD's grey and paint one off-white, satin finish
+const PLA = { vertexColors: false, color: 0xf3f3ef, metalness: 0, roughness: 0.55, clearcoat: 0.08, clearcoatRoughness: 0.6 };
+const PARTS = [
+  { id: 'case', ref: 'H1', name: '電子部品ケース（上部ドーム）', en: 'components_case', sel: /^components_case(_cover)?$/, finish: PLA, level: 4, ghost: true,
+    desc: '頭の上に載る白いドーム。中に ESP32・サーボドライバー・心拍センサー・距離センサー・アンロック用サーボが収まっています。後ろ側の2つの丸穴にはDCジャックが付き、下側の開口部からサーボのケーブルが入ります。',
+    spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['外形', '約 136 × 85 × 82 mm'], ['DCジャック', '後ろ側に2つ（CADには部品なし）']] },
+  { id: 'esp32', ref: 'U1', name: 'ESP32 開発ボード', en: 'ESP32 DevKit (38 pin)', sub: '制御・頭脳', sel: /^PCB_ESP32/, level: 3, layer: 1, callout: true,
+    desc: 'ヘッドギアの頭脳。Wi‑FiでPCとつながり、OSCメッセージを受け取ってサーボを動かし、心拍と距離の値を送り返します。通信・サーボ・センサーの処理はCore1のタスクで回り、5秒止まるとウォッチドッグが自動で再起動します。',
+    spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9003）'], ['I²C', 'PCA9685（0x40）・VL53L0X'], ['入力', '心拍 GPIO25（割り込み）'], ['表示', 'LED GPIO2（Wi‑Fi接続中は点灯）'], ['安定動作', 'ウォッチドッグ 5秒 / Wi‑Fi自動再接続']] },
+  { id: 'pca', ref: 'U2', name: 'PCA9685 サーボドライバー', en: 'PCA9685 16ch', sub: 'サーボ8個をまとめて制御', sel: /^PCA9685/, level: 3, layer: 0.5, callout: true,
+    desc: 'ESP32からI²Cで指示を受けて、16ch分のPWM信号を作る基板。このヘッドギアでは8ch（ch0〜3・ch12〜15）を使い、50Hzのパルス幅でサーボの角度を決めます。パルスの出だしをチャンネルごとに少しずつずらし、電流が一度に集中しないようにしています。',
+    spec: [['接続', 'I²C（アドレス 0x40）'], ['PWM', '50 Hz・パルス幅 0.5〜2.5 ms（0〜180°）'], ['使用ch', 'サーボ #0〜3 → ch0〜3 / #4〜7 → ch12〜15'], ['更新', '20 msごと（角度が変わったchだけ書き込む）']] },
+  { id: 'unlock', ref: 'M2', name: 'SG90（アンロック）', en: 'SG90 · servo #6', sub: '出力（/unlock）', sel: /Sg90#1\//, horns: 'sg90', level: 3, callout: true,
+    desc: 'ケースの中にある小型サーボ。フェーズ5で /unlock 1 を受け取ると30°まで回り、0.5秒たつと自動で0°に戻ります。',
+    spec: [['担当', 'サーボ #6（ch14）'], ['動き', '0° → 30° → 0.5秒後に 0°'], ['角度の上限', '35°']] },
+  { id: 'heart', ref: 'U3', name: '心拍センサー', en: 'heart-rate sensor', sub: '入力（GPIO25）', sel: /^30100/, level: 3, layer: 1, callout: true,
+    desc: '脈拍を検出するセンサー。1拍ごとに出る信号の立ち上がりをESP32が割り込みで数え、フェーズ3〜4のあいだ、1拍ごとに /heartrate 1 をPCへ送ります。',
+    spec: [['接続', 'GPIO25（立ち上がりで割り込み）'], ['ノイズ対策', '200 ms未満の間隔は無視（最大 300 bpm）'], ['起動直後', '最初の10拍は送らない'], ['PCへ送信', '/heartrate 1（フェーズ3〜4）'], ['CAD上の形状', 'MAX30100 モジュール']] },
+  { id: 'tof', ref: 'U4', name: 'VL53L0X 距離センサー', en: 'VL53L0X ToF', sub: '入力（I²C）', sel: /^VL53L0X/, level: 3, layer: 2, callout: true,
+    desc: 'レーザー光が往復する時間で距離を測るToFセンサー。ケースの上部にあり、フェーズ3のあいだ100msごとに測定値を読み、50msごとに /braindistance（mm）としてPCへ送ります。',
+    spec: [['接続', 'I²C（PCA9685と共用）'], ['測定', '連続測定 50 ms / 読み取り 100 msごと'], ['PCへ送信', '/braindistance（mm、50 msごと・フェーズ3）'], ['失敗時', '初期化できなくても距離なしで動作を続ける']] },
+  { id: 'latch', ref: 'H4', name: 'バネ・リールまわり', en: 'spring / reelcover / coil_cover', sel: /^(spring|reelcover|coil_cover)$/, finish: PLA, level: 2,
+    desc: 'バネ（spring）と、リールのカバー、コイルのカバー。ケースの中のアンロック用サーボと組み合わさる部分です。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
+  { id: 'headmove', ref: 'H3', name: '可動プレート', en: 'head_move', sel: /^head_move/, finish: PLA, level: 2, ghost: true,
+    desc: 'ケースの下にある円盤状のプレート。ケースとヘッドバンドのあいだに入ります。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
+  { id: 'servos', ref: 'M1', name: 'MG90S サーボ ×6', en: 'MG90S', sub: '出力（/power）', sel: /^M90S_ali/, horns: 'mg90s', level: 1, anchor: 'one', callout: true,
+    desc: 'ヘッドバンドの左右に3個ずつ並んだ、金属ギアの小型サーボ。PCから届く /power の6chの値に合わせて、腕（ホーン）の角度を変えます。',
+    spec: [['担当', 'サーボ #0〜5（ch0〜3・ch12〜13）'], ['角度', '/power 0〜100 → 0〜90°（各サーボ 40° で頭打ち）'], ['動く時', 'フェーズ2〜4（フェーズ2の開始で 0° に戻す）'], ['向き', 'サーボごとに回転方向の反転設定あり']] },
+  { id: 'frame', ref: 'H2', name: 'ヘッドバンドフレーム', en: 'top / servomount', sel: /^(top|top_L|top_R|back_attach|front_attach|servomount_\d|COMPOUND)$/, where: (c) => !FRONT(c), finish: PLA, level: 1,
+    desc: '頭にかぶる部分の骨組み。左右のサーボマウントにMG90Sが3個ずつ固定されています。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['部品', 'top / top_L / top_R / back_attach / front_attach / servomount ×6 ほか']] },
+  { id: 'mirror', ref: 'M3', name: 'SG90（ミラー）', en: 'SG90 · servo #7', sub: '出力（/mirror）', sel: /Sg90#2\//, horns: 'sg90', level: 0, callout: true,
+    desc: '前方のスタンドに付いた小型サーボ。フェーズ6で /mirror 1 を受け取ると2秒かけて170°まで、フェーズ7で /mirror 0 を受け取ると2秒かけて0°まで、なめらかに回ります。',
+    spec: [['担当', 'サーボ #7（ch15）'], ['動き', '0° ⇄ 170°（2秒かけて一定の速さで）'], ['フェーズ', '6：170°へ / 7：0°へ戻す']] },
+  { id: 'stand', ref: 'H5', name: 'スタンド', en: 'stand', sel: /^COMPOUND$/, where: FRONT, finish: PLA, level: 0,
+    desc: 'ヘッドギアを支える台。前の方にミラー用のサーボが付いています。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
+  { id: 'cables', ref: 'W1', name: 'サーボケーブル ×8', en: 'servo leads', sub: 'CADにはない配線', cables: true,
+    desc: '各サーボの3本の線（茶：GND・赤：電源・橙：信号）を、ヘッドバンドの外側に沿わせてケース後ろの窓から中へ入れ、PCA9685のピンにコネクタで差しています。CADには含まれていないため、実物の配線を参考に描いたイメージです。',
+    spec: [['線の色', '茶 GND / 赤 V+ / 橙 信号'], ['つなぎ先', 'サーボ #0〜3 → ch0〜3 / #4〜7 → ch12〜15'], ['経路', 'ヘッドバンドの外側 → ケース後ろの窓 → PCA9685（ケース内のSG90だけは内側を通る）']] },
+];
+const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
+// Explode: floors rise in order (stand → headband + servos → plate → electronics → case), each one
+// lifting clear of the one below; BASE_LIFT keeps even the bottom floor moving.
+const LAYER_GAP = 12;  // mm per 'layer' inside a floor at 100%
+const CLEARANCE = 10;  // mm between floors at 100%
+const BASE_LIFT = 10;  // mm the bottom floor (stand) rises at 100%
+
+// Surface finish by original STEP colour
+const FINISH = {
+  f3cb7c: { metalness: 1, roughness: 0.26 },      // gold-plated pins / pads
+  f4e5a7: { metalness: 1, roughness: 0.3 },
+  d1ccc0: { metalness: 0.9, roughness: 0.3 },     // tin / steel
+  cbcbcb: { metalness: 0.95, roughness: 0.28 },   // screws
+  ffffff: { metalness: 0.85, roughness: 0.3 },
+  f6f6f3: { metalness: 0.8, roughness: 0.32 },
+  cbcbad: { metalness: 0, roughness: 0.55 },      // grove socket plastic
+  b39657: { metalness: 0, roughness: 0.5 },       // ceramic
+  191919: { metalness: 0, roughness: 0.32, clearcoat: 0.4 },
+  434343: { metalness: 0, roughness: 0.45 },
+  cad1ee: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // PCB w/ solder mask
+  f7e9d1: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 },
+  db620b: { metalness: 0, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 }, // M5 body
+  a0a0a0: { metalness: 0, roughness: 0.72 },  // printed parts
+  '3f3f3f': { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 }, // printed carbon shell
+  e5e8e5: { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 },   // PET film
+  '212124': { metalness: 0, roughness: 0.75 },                   // carbon ink
+  d1d1cc: { metalness: 0.9, roughness: 0.35 },                   // silver electrode
+  bfc2c7: { metalness: 0.95, roughness: 0.28 },                  // crimp terminal
+  b8bac2: { metalness: 0.95, roughness: 0.28 },                  // terminal pin
+  f7f7f5: { metalness: 0, roughness: 0.6 },                      // white stiffener
+  c4c5c4: { metalness: 0.9, roughness: 0.3 },                    // KY-003 pins
+  '404040': { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // KY-003 PCB
+};
+// ---------- How-it-works tour ----------
+// Based on headset_esp32.ino v3.4.
+const TOUR = [
+  { tab: '全体', labels: ['esp32', 'pca', 'servos', 'heart', 'tof'], title: '全体の構成', flow: 'PC ⇄ Wi‑Fi / OSC ⇄ ESP32 → PCA9685 → サーボ ×8', parts: [], explode: 0.42, ghost: true,
+    text: 'ESP32がWi‑Fi経由でPCとOSCメッセージをやりとりします。PCが /phase でフェーズ（1〜7）を指示し、ヘッドギアはフェーズに応じてサーボを動かしたり、心拍や距離の値を送ったりします。8個のサーボは、すべてPCA9685というサーボドライバーにつながっています。' },
+  { tab: '通信', labels: ['esp32'], title: 'PCとのやりとり（OSC）', flow: 'PC → /phase /power /unlock /mirror /init /reboot ／ ESP32 → /ask /heartrate /braindistance', path: [], parts: ['esp32'], explode: 0.42,
+    text: '起動するとWi‑Fiにつながり、PCへ /ask を送ります。受信はポート9000、送信は9003です。Wi‑Fiが切れても自動で再接続し、そのあいだもサーボの動きやOSCの受信は止まりません。処理が5秒止まるとウォッチドッグが再起動し、起動時にもう一度 /ask を送ります。' },
+  { tab: '圧力', labels: ['servos', 'pca'], title: '出力：/power でサーボ6個を動かす', flow: '/power（6ch・0〜100）→ ESP32 → I²C → PCA9685 → MG90S ×6', path: ['esp32', 'pca', 'servos'], cables: [0, 1, 2, 3, 4, 5], demo: 'power', parts: ['esp32', 'pca', 'servos', 'cables'], explode: 0.5,
+    text: 'フェーズ2〜4のあいだ、PCから届く /power の6chの値（0〜100）を、サーボ #0〜5 の角度に変えます。値は0〜90°に換算されますが、各サーボは40°で止まるように上限が付いています。脳デバイスが送る /power と同じ6chの形式です。フェーズ2に入ると、6個とも0°に戻ります。' },
+  { tab: '心拍', labels: ['heart', 'esp32'], title: '入力：心拍センサー', flow: '心拍センサー → GPIO25（割り込み）→ ESP32 → /heartrate', path: ['heart', 'esp32'], parts: ['heart', 'esp32'], explode: 0.42,
+    text: '心拍センサーが1拍ごとに出す信号の立ち上がりを、ESP32が割り込みで数えます。200ms未満の間隔はノイズとして無視し、起動直後の10拍は送りません。フェーズ3〜4のあいだ、1拍ごとに /heartrate 1 をPCへ送ります。' },
+  { tab: '距離', labels: ['tof', 'esp32'], title: '入力：距離センサー（VL53L0X）', flow: 'VL53L0X → I²C → ESP32 → /braindistance（50msごと）', path: ['tof', 'esp32'], parts: ['tof', 'esp32'], explode: 0.42,
+    text: 'ケース上部のVL53L0Xが、レーザー光が往復する時間で距離を測ります。フェーズ3のあいだ100msごとに測定値を読み、50msごとに /braindistance（mm）としてPCへ送ります。センサーを初期化できなかったときは、距離なしで動作を続けます。' },
+  { tab: 'アンロック', labels: ['unlock', 'pca'], title: '出力：アンロック', flow: '/unlock 1 → PCA9685 ch14 → SG90 #6（30° → 0.5秒後に 0°）', path: ['esp32', 'pca', 'unlock'], cables: [6], demo: 'unlock', parts: ['esp32', 'pca', 'unlock', 'latch', 'cables'], explode: 0.5,
+    text: 'フェーズ5で /unlock 1 を受け取ると、ケースの中のSG90（サーボ #6）が30°まで回り、0.5秒たつと自動で0°に戻ります。' },
+  { tab: 'ミラー', labels: ['mirror', 'pca'], title: '出力：ミラー', flow: '/mirror 1 → 170°（2秒）／ /mirror 0 → 0°（2秒）', path: ['esp32', 'pca', 'mirror'], cables: [7], demo: 'mirror', parts: ['esp32', 'pca', 'mirror', 'cables'], explode: 0.4,
+    text: 'フェーズ6で /mirror 1 を受け取ると、前方のSG90（サーボ #7）が2秒かけて170°まで回ります。フェーズ7で /mirror 0 を受け取ると、同じく2秒かけて0°に戻ります。角度は20msごとに少しずつ更新されるので、なめらかに動きます。' },
+];
+
+// ---------- Language: 日本語 (default, in PARTS/TOUR above) / 繁體中文（台灣） ----------
+const UI = {
+  ja: {
+    title: 'ヘッドギアの中身', loading: 'LOADING MODEL…', loadFail: 'モデルを読み込めませんでした。ページを再読み込みしてください。',
+    explore: '観察', tour: 'しくみ', explode: '分解', ghost: '外装を透かす', spin: '自動回転', reset: '視点を戻す',
+    prev: '← 前へ', next: '次へ →',
+    stage: 'ヘッドギアの3Dモデル。ドラッグで回転、ピンチで拡大', modes: '表示モード', track: '高さ方向の分解量', close: '閉じる',
+    demoPower: '/power を送ってみる（0〜100）', demoAuto: '自動', demoPowerNote: '数字は「送った値 → サーボの角度」。40°で頭打ちになります。',
+    demoUnlock: '/unlock 1 を送る', demoMirrorOpen: '/mirror 1（170°へ）', demoMirrorClose: '/mirror 0（0°へ）', demoAngle: 'いまの角度', sibling: '脳デバイスへ →',
+  },
+  zh: {
+    title: '頭戴裝置的內部', loading: '模型載入中…', loadFail: '無法載入模型，請重新整理頁面。',
+    explore: '觀察', tour: '運作原理', explode: '分解', ghost: '外殼透視', spin: '自動旋轉', reset: '重設視角',
+    prev: '← 上一步', next: '下一步 →',
+    stage: '頭戴裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉',
+    demoPower: '試著傳送 /power（0〜100）', demoAuto: '自動', demoPowerNote: '數字是「傳送的值 → 伺服馬達角度」，到 40° 封頂。',
+    demoUnlock: '傳送 /unlock 1', demoMirrorOpen: '/mirror 1（轉到 170°）', demoMirrorClose: '/mirror 0（回到 0°）', demoAngle: '目前角度', sibling: '前往腦裝置 →',
+  },
+};
+const ZH_PARTS = {
+  case: { name: '電子零件外殼（上方圓頂）', desc: '戴在頭頂上的白色圓頂。裡面裝有 ESP32、伺服馬達驅動板、心跳感測器、距離感測器和解鎖用伺服馬達。後方的 2 個圓孔裝有 DC 插座，伺服馬達的線從下方的開口進入。',
+    spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['外形', '約 136 × 85 × 82 mm'], ['DC 插座', '後方 2 個（CAD 中沒有零件）']] },
+  esp32: { name: 'ESP32 開發板', sub: '控制・大腦',
+    desc: '頭戴裝置的大腦。透過 Wi‑Fi 連線到電腦，接收 OSC 訊息來驅動伺服馬達，並回傳心跳與距離的數值。通訊、伺服馬達與感測器的處理在 Core1 的任務中執行，停止 5 秒時看門狗會自動重新啟動。',
+    spec: [['通訊', 'Wi‑Fi + OSC（UDP 接收 9000／傳送 9003）'], ['I²C', 'PCA9685（0x40）・VL53L0X'], ['輸入', '心跳 GPIO25（中斷）'], ['指示燈', 'LED GPIO2（Wi‑Fi 連線中亮燈）'], ['穩定運作', '看門狗 5 秒／Wi‑Fi 自動重新連線']] },
+  pca: { name: 'PCA9685 伺服馬達驅動板', sub: '統一控制 8 個伺服馬達',
+    desc: '透過 I²C 接收 ESP32 的指令，產生 16 通道 PWM 訊號的電路板。這個頭戴裝置使用其中 8 個通道（ch0〜3・ch12〜15），以 50Hz 的脈衝寬度決定伺服馬達的角度。各通道的脈衝起點稍微錯開，避免電流同時集中。',
+    spec: [['連接', 'I²C（位址 0x40）'], ['PWM', '50 Hz・脈衝寬度 0.5〜2.5 ms（0〜180°）'], ['使用通道', '伺服 #0〜3 → ch0〜3／#4〜7 → ch12〜15'], ['更新', '每 20 ms（只寫入角度有變化的通道）']] },
+  unlock: { name: 'SG90（解鎖）', sub: '輸出（/unlock）',
+    desc: '外殼內的小型伺服馬達。在階段 5 收到 /unlock 1 時轉到 30°，0.5 秒後自動回到 0°。',
+    spec: [['負責', '伺服 #6（ch14）'], ['動作', '0° → 30° → 0.5 秒後回到 0°'], ['角度上限', '35°']] },
+  heart: { name: '心跳感測器', sub: '輸入（GPIO25）',
+    desc: '偵測脈搏的感測器。ESP32 以中斷計算每一拍訊號的上升緣，在階段 3〜4 期間，每一拍傳送一次 /heartrate 1 給電腦。',
+    spec: [['連接', 'GPIO25（上升緣中斷）'], ['雜訊處理', '忽略小於 200 ms 的間隔（最高 300 bpm）'], ['剛啟動時', '前 10 拍不傳送'], ['傳送給電腦', '/heartrate 1（階段 3〜4）'], ['CAD 中的外形', 'MAX30100 模組']] },
+  tof: { name: 'VL53L0X 距離感測器', sub: '輸入（I²C）',
+    desc: '以雷射光往返時間測量距離的 ToF 感測器。位於外殼上方，在階段 3 期間每 100ms 讀取一次測量值，並每 50ms 以 /braindistance（mm）傳送給電腦。',
+    spec: [['連接', 'I²C（與 PCA9685 共用）'], ['測量', '連續測量 50 ms／每 100 ms 讀取'], ['傳送給電腦', '/braindistance（mm，每 50 ms・階段 3）'], ['失敗時', '無法初始化時，不使用距離繼續運作']] },
+  latch: { name: '彈簧・捲輪周邊', desc: '彈簧（spring）、捲輪的蓋子和線圈的蓋子。與外殼內的解鎖用伺服馬達搭配的部分。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
+  headmove: { name: '可動板', desc: '外殼下方的圓盤狀板子，位於外殼和頭帶之間。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
+  servos: { name: 'MG90S 伺服馬達 ×6', sub: '輸出（/power）',
+    desc: '頭帶左右各排列 3 個的金屬齒輪小型伺服馬達。依照電腦傳來的 /power 6 通道數值，改變擺臂（舵角）的角度。',
+    spec: [['負責', '伺服 #0〜5（ch0〜3・ch12〜13）'], ['角度', '/power 0〜100 → 0〜90°（每個伺服在 40° 封頂）'], ['動作時機', '階段 2〜4（進入階段 2 時回到 0°）'], ['方向', '每個伺服馬達可設定反轉']] },
+  frame: { name: '頭帶框架', desc: '戴在頭上部分的骨架。左右的伺服馬達座上各固定 3 個 MG90S。', spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['零件', 'top／top_L／top_R／back_attach／front_attach／servomount ×6 等']] },
+  mirror: { name: 'SG90（鏡子）', sub: '輸出（/mirror）',
+    desc: '裝在前方支架上的小型伺服馬達。在階段 6 收到 /mirror 1 時花 2 秒轉到 170°，在階段 7 收到 /mirror 0 時花 2 秒回到 0°，動作平順。',
+    spec: [['負責', '伺服 #7（ch15）'], ['動作', '0° ⇄ 170°（以 2 秒等速轉動）'], ['階段', '6：轉到 170°／7：回到 0°']] },
+  stand: { name: '支架', desc: '支撐頭戴裝置的底座。前方裝有鏡子用的伺服馬達。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
+  cables: { name: '伺服馬達線 ×8', sub: 'CAD 中沒有的配線',
+    desc: '每個伺服馬達的 3 條線（棕：GND・紅：電源・橙：訊號）沿著頭帶外側，從外殼後方的窗口進入，再以接頭插在 PCA9685 的針腳上。因為 CAD 中沒有包含，這是參考實物配線畫出的示意。',
+    spec: [['線的顏色', '棕 GND／紅 V+／橙 訊號'], ['連接位置', '伺服 #0〜3 → ch0〜3／#4〜7 → ch12〜15'], ['路徑', '頭帶外側 → 外殼後方的窗口 → PCA9685（只有外殼內的 SG90 走內側）']] },
+};
+const ZH_TOUR = [
+  { tab: '全體', title: '整體構成', flow: '電腦 ⇄ Wi‑Fi / OSC ⇄ ESP32 → PCA9685 → 伺服馬達 ×8',
+    text: 'ESP32 透過 Wi‑Fi 與電腦交換 OSC 訊息。電腦用 /phase 指定階段（1〜7），頭戴裝置依照階段驅動伺服馬達，或傳送心跳與距離的數值。8 個伺服馬達全部連接到名為 PCA9685 的伺服馬達驅動板。' },
+  { tab: '通訊', title: '與電腦的溝通（OSC）', flow: '電腦 → /phase /power /unlock /mirror /init /reboot ／ ESP32 → /ask /heartrate /braindistance',
+    text: '開機後連上 Wi‑Fi，並向電腦傳送 /ask。接收使用連接埠 9000，傳送使用 9003。Wi‑Fi 中斷時會自動重新連線，期間伺服馬達的動作與 OSC 接收也不會停止。處理停止 5 秒時看門狗會重新啟動，啟動時會再傳送一次 /ask。' },
+  { tab: '壓力', title: '輸出：用 /power 驅動 6 個伺服馬達', flow: '/power（6ch・0〜100）→ ESP32 → I²C → PCA9685 → MG90S ×6',
+    text: '在階段 2〜4 期間，把電腦傳來的 /power 6 通道數值（0〜100）轉換成伺服 #0〜5 的角度。數值會換算成 0〜90°，但每個伺服馬達都設有在 40° 停止的上限。格式與腦裝置傳送的 /power 相同，都是 6 通道。進入階段 2 時，6 個伺服馬達都會回到 0°。' },
+  { tab: '心跳', title: '輸入：心跳感測器', flow: '心跳感測器 → GPIO25（中斷）→ ESP32 → /heartrate',
+    text: 'ESP32 以中斷計算心跳感測器每一拍輸出訊號的上升緣。小於 200ms 的間隔視為雜訊忽略，剛啟動時的前 10 拍不傳送。在階段 3〜4 期間，每一拍傳送一次 /heartrate 1 給電腦。' },
+  { tab: '距離', title: '輸入：距離感測器（VL53L0X）', flow: 'VL53L0X → I²C → ESP32 → /braindistance（每 50ms）',
+    text: '外殼上方的 VL53L0X 以雷射光往返的時間測量距離。在階段 3 期間每 100ms 讀取一次測量值，並每 50ms 以 /braindistance（mm）傳送給電腦。感測器無法初始化時，會在沒有距離的情況下繼續運作。' },
+  { tab: '解鎖', title: '輸出：解鎖', flow: '/unlock 1 → PCA9685 ch14 → SG90 #6（30° → 0.5 秒後回到 0°）',
+    text: '在階段 5 收到 /unlock 1 時，外殼內的 SG90（伺服 #6）會轉到 30°，0.5 秒後自動回到 0°。' },
+  { tab: '鏡子', title: '輸出：鏡子', flow: '/mirror 1 → 170°（2 秒）／ /mirror 0 → 0°（2 秒）',
+    text: '在階段 6 收到 /mirror 1 時，前方的 SG90（伺服 #7）會花 2 秒轉到 170°。在階段 7 收到 /mirror 0 時，同樣花 2 秒回到 0°。角度每 20ms 更新一點，所以動作平順。' },
+];
+let LANG = 'ja';
+try {
+  const saved = localStorage.getItem('bd-lang');
+  LANG = saved === 'zh' || saved === 'ja' ? saved : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ja';
+} catch (e) { /* storage blocked: keep default */ }
+const ui = (k) => UI[LANG][k];
+const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
+const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
+
+
+// Sibling page link: the other artifact when this page is shown on Claude; otherwise the other page
+// next to this one, wherever it is served from. data-local lists the relative candidates —
+// npm run serve and dist/ give / ⇄ /headgear/, a server rooted at the project folder (e.g. VS Code
+// Live Server) gives /app/ ⇄ /headgear/app/ — and the first one whose model.json exists wins.
+{
+  const onClaude = /claude/i.test(location.hostname) || [...(location.ancestorOrigins || [])].some((o) => /claude/i.test(o));
+  for (const a of document.querySelectorAll('.sibling')) {
+    // installed as an app (home screen / PWA): never open a new tab, it would leave the app
+    const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    if (onClaude) { a.href = a.dataset.artifact; if (!standalone) { a.target = '_blank'; a.rel = 'noopener'; } continue; }
+    const tries = a.dataset.local.split(' ');
+    a.href = tries[0];
+    (async () => {
+      for (const t of tries) {
+        try { if ((await fetch(new URL(t + 'model.json', location.href), { method: 'HEAD', cache: 'no-store' })).ok) { a.href = t; return; } } catch (e) { /* try the next one */ }
+      }
+    })();
+  }
+}
+
+// ---------- Renderer / scene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// The light and the model stay put while the camera orbits, so the shadow map only needs
+// redrawing when parts move or change visibility (S.shadowDirty), not every frame.
+renderer.shadowMap.autoUpdate = false;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 1, 6000);
+const HOME = { pos: new THREE.Vector3(470, 400, 560), target: new THREE.Vector3(0, 110, 0) };
+camera.position.copy(HOME.pos);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME.target);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 120;
+controls.maxDistance = 2400;
+controls.autoRotateSpeed = 1.2;
+controls.autoRotate = true;  // on at start; the 自動回転 chip toggles it
+
+const key = new THREE.DirectionalLight(0xfff6ea, 1.8);
+key.position.set(320, 640, 360);  // far enough that the fully exploded stack stays inside the shadow camera
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -320, right: 320, top: 320, bottom: -320, near: 10, far: 1600 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.25;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd4ff, 0.9);
+rim.position.set(-120, 60, -100);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.35));
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), new THREE.ShadowMaterial({ opacity: 0.18 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.4;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// CAD is Z-up: rotate so CAD Z becomes the scene's height axis; centre the footprint.
+const root = new THREE.Group();
+root.rotation.x = -Math.PI / 2;
+root.position.set(0, 0, -2);
+scene.add(root);
+
+// ---------- State ----------
+const S = { shadowDirty: true, explode: 0, explodeShown: 0, ghost: false, selected: null, mode: 'explore', step: 0 };
+const meshParts = new Map(); // mesh -> part
+const partBoxes = {};        // part id -> Box3 in root-local (assembled)
+
+// ---------- Load ----------
+// model.json = { glb: base64 } — decoded here and parsed in memory
+const loadFail = (err) => {
+  document.getElementById('loading').textContent = ui('loadFail');
+  console.error(err);
+};
+fetch('model.json').then((r) => r.json()).then(({ glb }) => {
+  const bytes = Uint8Array.from(atob(glb), (c) => c.charCodeAt(0));
+  new GLTFLoader().parse(bytes.buffer, '', onModel, loadFail);
+}).catch(loadFail);
+function onModel(gltf) {
+  const meshes = [];
+  gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  const pathOf = (m) => (m.userData && m.userData.path) || '';
+  const claimed = new Set();
+  // claim order: the most specific selectors first, so the M5's screws / socket are not swallowed by m5
+  const order = [...PARTS].sort((a, b) => (a.id === 'm5') - (b.id === 'm5'));
+  const centre = (m) => (m.geometry.computeBoundingBox(), m.geometry.boundingBox.getCenter(new THREE.Vector3()));
+  for (const p of order) p.srcs = p.cables ? [] : meshes.filter((m) => !claimed.has(m) && p.sel.test(pathOf(m)) && (!p.where || p.where(centre(m))) && claimed.add(m));
+  const loose = meshes.filter((m) => !claimed.has(m));
+  if (loose.length) console.warn('meshes not in any part:', [...new Set(loose.map(pathOf))]);
+  for (const p of PARTS) {
+    p.objs = [];
+    const box = new THREE.Box3();
+    // One draw call per surface finish: a part's meshes that share a material are merged
+    // (e.g. the TP4057's 94 solids become a handful of meshes). Looks the same, far fewer draws.
+    const byFinish = new Map();
+    const over = p.finish;
+    const horns = p.horns ? p.srcs.filter((m) => HORNS[p.horns].parts.test(pathOf(m))) : [];
+    for (const src of p.srcs) {
+      if (horns.includes(src)) continue;
+      const hex = (src.userData && src.userData.c) || '';
+      const key = over ? 'part' : hex;
+      if (!byFinish.has(key)) byFinish.set(key, { f: { ...(FINISH[hex] || { metalness: 0, roughness: 0.5 }), ...(over || {}) }, geos: [] });
+      byFinish.get(key).geos.push(src.geometry);
+    }
+    for (const { f, geos } of byFinish.values()) {
+      const geo = geos.length > 1 ? mergeGeometries(geos) : geos[0];
+      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 1, ...f }));
+      m.castShadow = true; m.receiveShadow = true;
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 32),
+        new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
+      edges.raycast = () => {};
+      m.add(edges);
+      m.userData.edges = edges;
+      const holder = new THREE.Group();
+      holder.add(m);
+      root.add(holder);
+      p.objs.push(m);
+      meshParts.set(m, p);
+    }
+    if (horns.length) buildHorns(p, horns, box);
+    p.holders = p.objs.map((m) => m.userData.holder || m.parent);
+    partBoxes[p.id] = box;
+    if (p.anchor === 'one' && p.srcs.length) {
+      // one box per physical unit (e.g. each of the 4 film sensors): merge source meshes that touch
+      const units = [];
+      for (const src of p.srcs) {
+        src.geometry.computeBoundingBox();
+        const b = src.geometry.boundingBox.clone();
+        for (let k = units.length - 1; k >= 0; k--) if (units[k].clone().expandByScalar(0.5).intersectsBox(b)) b.union(units.splice(k, 1)[0]);
+        units.push(b);
+      }
+      p.units = units;
+      p.anchorBox = units.reduce((a, b) => (b.max.x + b.min.x > a.max.x + a.min.x ? b : a));  // right-most
+    }
+  }
+  buildServos();
+  computeRises();
+  S.shadowDirty = true;
+  document.getElementById('loading').hidden = true;
+  buildCallouts();
+  applyLook();
+}
+
+// ---------- Servos #0–7: numbering, moving horns, cables (not in the CAD) ----------
+// Numbering is ours (the sketch only fixes the channels), chosen so no two leads cross: right
+// MG90S front→back = #0–2, left MG90S front→back = #3–5, the SG90 in the case = #6 (unlock), the
+// SG90 on the stand = #7 (mirror). Channels follow writeServo(): #0–3 → ch0–3, #4–7 → ch12–15;
+// ch0 is taken as the header's +x end.
+const SERVO_MAX = [40, 40, 40, 40, 40, 40, 35, 170];               // servoMaxAngle[]
+const SERVO_REV = [false, false, true, true, true, false, true, true];  // servoReverse[]
+const SERVO_CH = [0, 1, 2, 3, 12, 13, 14, 15];
+const SERVO_SPEED = 600;  // °/s, MG90S / SG90 ≈ 0.1 s per 60°
+const servos = [];
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const unitKey = (m) => m.userData.path.split('/')[0];  // "M90S_ali#3", "[4145] … Sg90#1"
+
+// principal axis of a point cloud (largest spread) and its centre
+function mainAxis(geos) {
+  const pts = [];
+  for (const g of geos) { const a = g.attributes.position; for (let i = 0; i < a.count; i++) pts.push(V(a.getX(i), a.getY(i), a.getZ(i))); }
+  const c = pts.reduce((s, p) => s.add(p), V()).divideScalar(pts.length);
+  const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (const p of pts) { const d = p.clone().sub(c).toArray(); for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) C[a][b] += d[a] * d[b]; }
+  let v = V(0.6, 0.5, 0.4);
+  for (let it = 0; it < 60; it++) v = V(...[0, 1, 2].map((a) => C[a][0] * v.x + C[a][1] * v.y + C[a][2] * v.z)).normalize();
+  return { axis: v, centre: c };
+}
+// horns turn about the output shaft: MG90S = shaft (axe) + arm, SG90 = horn pieces + horn screw
+const HORNS = {
+  mg90s: { parts: /\/(axe|MG90S_arm01)$/, axis: /\/axe$/ },
+  sg90: { parts: /Tower Pro\.[2346]_/, axis: /Tower Pro\.6_/ },
+};
+function buildHorns(p, srcs, box) {
+  const h = HORNS[p.horns], units = new Map();
+  for (const m of srcs) { const k = unitKey(m); if (!units.has(k)) units.set(k, []); units.get(k).push(m); }
+  p.hornUnits = {};
+  for (const [key, list] of units) {
+    const { axis, centre } = mainAxis(list.filter((m) => h.axis.test(m.userData.path)).map((m) => m.geometry));
+    const mesh = new THREE.Mesh(mergeGeometries(list.map((m) => m.geometry)),
+      new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0.2, roughness: 0.45 }));
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.copy(centre).negate();
+    mesh.geometry.computeBoundingBox(); box.union(mesh.geometry.boundingBox);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 32), new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
+    edges.raycast = () => {}; mesh.add(edges); mesh.userData.edges = edges;
+    const pivot = new THREE.Group(), holder = new THREE.Group();
+    pivot.position.copy(centre); pivot.add(mesh); holder.add(pivot); root.add(holder);
+    mesh.userData.holder = holder;
+    p.objs.push(mesh); meshParts.set(mesh, p);
+    p.hornUnits[key] = { pivot, axis };
+  }
+}
+
+// ----- cables -----
+// Drawn after the real wiring. Each lead leaves its servo, climbs the outside of the headband to a
+// back corner, runs along under the case's back window, rises straight up behind its pin and goes in
+// through the window into a 3-pin connector on the PCA9685. Bundles: right corner = #0–2, left
+// corner = #3–5 and #7 (its lead comes round the front). Leads bound for pins further from their
+// corner run lower, so each passes under the risers of the nearer ones and no two leads cross.
+// The SG90 in the case (#6) stays inside and reaches its connector from the front.
+// Both ends come from the model: the servo's wire stub and the header pins (3 rows × 16).
+const WIRE_COLS = [0x4a2a12, 0xc62828, 0xf08c00];  // GND brown, V+ red, signal orange
+const STUB_COLS = new Set(['ff0000', 'aa5500', 'ffff00', 'ff8c00', '8c5c08', 'c7911d']);
+const STUB_WIRE = { aa5500: 0, '8c5c08': 0, ff0000: 1, ffff00: 2, ff8c00: 2 };  // stub colour -> wire
+const WIRE_R = 0.5, WIRE_GAP = 1.05, SEG = 160;
+const WIN = { y: 132, top: 190 };  // just behind the back window (x ±28, z 166–193), mm
+const cables = [];
+let cablesAt = null;
+
+// where a servo's lead leaves its case: end of the wire stub, its direction, and each wire's offset
+function servoLead(srcs) {
+  const stub = new THREE.Box3(), body = new THREE.Box3(), wires = [];
+  for (const m of srcs) {
+    m.geometry.computeBoundingBox();
+    const c = m.userData.c, b = m.geometry.boundingBox;
+    (STUB_COLS.has(c) ? stub : body).union(b);
+    if (c in STUB_WIRE) wires[STUB_WIRE[c]] = b.getCenter(V());
+  }
+  const centre = stub.getCenter(V()), dir = centre.clone().sub(body.getCenter(V())).normalize();
+  const end = centre.clone().addScaledVector(dir, Math.max(...stub.getSize(V()).toArray()) / 2);
+  const offs = [0, 1, 2].map((k) => (wires[k] ? wires[k].clone().sub(centre).projectOnPlane(dir) : V()));
+  return { end, dir, offs };
+}
+// header pin tips per channel and row (row 0 GND, 1 V+, 2 signal) and the pin direction
+function headerPins(srcs) {
+  const pins = [];
+  for (const m of srcs) {
+    if (m.userData.c !== 'c7911d') continue;
+    m.geometry.computeBoundingBox();
+    const b = m.geometry.boundingBox, sz = b.getSize(V());
+    if (sz.z > 8 && sz.x < 1.2) pins.push(b.clone());
+  }
+  const sz = pins[0].getSize(V());
+  const n = V(0, -(sz.y - 0.6), sz.z).normalize();  // the board is tilted: pins lean towards -y
+  const cy = (b) => (b.min.y + b.max.y) / 2, cx = (b) => (b.min.x + b.max.x) / 2;
+  pins.sort((a, b) => cy(b) - cy(a));                 // GND row (black) has the highest y
+  const rows = [];
+  for (const b of pins) { const r = rows[rows.length - 1]; if (r && Math.abs(cy(r[0]) - cy(b)) < 1) r.push(b); else rows.push([b]); }
+  const tips = rows.map((r) => r.sort((a, b) => cx(a) - cx(b)).map((b) => V(cx(b), b.min.y + 0.3, b.max.z)));
+  return { tip: (ch, row) => tips[row][15 - ch], n };  // channel 0 at +x
+}
+function buildServos() {
+  // #0–7 (see the numbering note above)
+  const groups = new Map();
+  for (const m of byId.servos.srcs) { const k = unitKey(m); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(m); }
+  const mg = [...groups].map(([key, srcs]) => ({ key, srcs, part: byId.servos, lead: servoLead(srcs) }));
+  const side = (s) => mg.filter((u) => Math.sign(u.lead.end.x) === s).sort((a, b) => a.lead.end.y - b.lead.end.y);
+  const sg = (part) => ({ key: unitKey(part.srcs[0]), srcs: part.srcs, part, lead: servoLead(part.srcs) });
+  [...side(1), ...side(-1), sg(byId.unlock), sg(byId.mirror)].forEach((u, i) => {
+    const h = u.part.hornUnits[u.key];
+    servos.push({ ...u, i, ch: SERVO_CH[i], pivot: h.pivot, axis: h.axis, angle: 0, target: 0 });
+  });
+  buildCables();
+}
+function buildCables() {
+  const p = byId.cables, { tip, n } = headerPins(byId.pca.srcs);
+  const rowDir = V(0, n.z, -n.y);  // along the board, across the three rows
+  const bundleOf = (sv) => (sv.i <= 2 ? 1 : -1);  // corner side: +1 right, -1 left (#3–7)
+  // height of each lead's run under the window: further from its corner = lower
+  const reach = (sv) => Math.abs(tip(sv.ch, 1).x - bundleOf(sv) * 68);
+  for (const side of [1, -1]) {
+    servos.filter((sv) => sv.i !== 6 && bundleOf(sv) === side).sort((x, y) => reach(y) - reach(x))
+      .forEach((sv, rank) => { sv.run = 146 + rank * 3.6; sv.lane = WIN.y - 4 + rank * 3.2; });
+  }
+  const boxes = [];
+  servos.forEach((sv) => {
+    const { i, ch, lead, part } = sv, E = lead.end, pinTop = tip(ch, 1), px = pinTop.x;
+    const top = pinTop.clone().addScaledVector(n, 3);        // wire leaves the connector here
+    const above = pinTop.clone().addScaledVector(n, 5.5);
+    // waypoints [point, w]: w = 0 moves with the servo, 1 with the PCA9685, between = blend
+    const pts = [[E, 0], [E.clone().addScaledVector(lead.dir, 7), 0]];
+    if (i === 6) {
+      // inside the case: up beside the board's left edge, then over to the connector from the front
+      pts.push([V(-33, 116, 176), 0.6], [V(-33, 106, above.z + 2), 1], [V(px, pinTop.y - 4, above.z + 3), 1]);
+    } else {
+      const s = bundleOf(sv);
+      if (i === 7) pts.push([V(40, -62, 98), 0.02], [V(0, -56, 96), 0.04], [V(-40, -40, 100), 0.07], [V(-70, -10, 110), 0.12], [V(-80, 50, 132), 0.2]);
+      else pts.push([V(s * Math.max(Math.abs(E.x) + 8, 72), E.y, E.z + 16), 0.1]);
+      pts.push([V(s * 68, sv.lane, sv.run), 0.3], [V(px, sv.lane, sv.run), 0.55], [V(px, sv.lane, WIN.top - 4), 0.9], [V(px, pinTop.y + 6, above.z), 1]);
+    }
+    pts.push([above, 1], [top, 1]);
+    const ends = [0, 1, 2].map((k) => tip(ch, k).clone().sub(pinTop));
+    cables.push({ part, pts, starts: lead.offs, ends });
+    // 3-pin connector housing on the pins
+    const g = new THREE.BoxGeometry(2.6, 8.4, 13);
+    g.applyMatrix4(new THREE.Matrix4().makeBasis(V(1, 0, 0), rowDir, n).setPosition(pinTop.clone().addScaledVector(n, -3.5)));
+    boxes.push(g);
+  });
+  const edges = () => { const e = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ transparent: true })); e.visible = false; return e; };
+  p.objs = [...WIRE_COLS, 0x1b1b1b].map((col, k) => {
+    const m = new THREE.Mesh(k < 3 ? new THREE.BufferGeometry() : mergeGeometries(boxes),
+      new THREE.MeshPhysicalMaterial({ color: col, roughness: k < 3 ? 0.45 : 0.6, clearcoat: k < 3 ? 0.3 : 0 }));
+    m.castShadow = true; m.receiveShadow = true;
+    m.userData.edges = edges(); m.add(m.userData.edges);
+    root.add(m); meshParts.set(m, p);
+    return m;
+  });
+  p.holders = [];
+  updateCables(0);
+}
+const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+// Lay the 3 wires side by side as a flat ribbon. The ribbon's sideways direction is carried along
+// the cable without spinning (parallel transport) and turned evenly so it starts in the stub's
+// wire order and ends in the header's row order: the wires never swap places.
+function ribbon(curve, starts, ends) {
+  const T = [], side = [];
+  for (let i = 0; i <= SEG; i++) T.push(curve.getTangentAt(i / SEG));
+  const pick = (d, t) => { const v = d.clone().projectOnPlane(t); return v.lengthSq() > 1e-6 ? v.normalize() : V(0, 0, 1).cross(t).normalize(); };
+  side[0] = pick(starts[0].clone().sub(starts[2]), T[0]);
+  for (let i = 1; i <= SEG; i++) side[i] = pick(side[i - 1], T[i]);
+  const want = pick(ends[0].clone().sub(ends[2]), T[SEG]);
+  const twist = Math.atan2(side[SEG].clone().cross(want).dot(T[SEG]), side[SEG].dot(want));
+  return side.map((v, i) => v.applyAxisAngle(T[i], twist * i / SEG));
+}
+function updateCables(t) {
+  cablesAt = t;
+  const pcaOff = partOffset(byId.pca, t), perWire = [[], [], []];
+  for (const c of cables) {
+    const servoOff = partOffset(c.part, t);
+    const pts = c.pts.map(([q, w]) => q.clone().setZ(q.z + servoOff + (pcaOff - servoOff) * w));
+    const curve = c.curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    const side = ribbon(curve, c.starts, c.ends);
+    for (let k = 0; k < 3; k++) {
+      const out = [];
+      for (let i = 0; i <= SEG; i++) {
+        const u = i / SEG, a = 1 - smooth(u / 0.05), b = smooth((u - 0.95) / 0.05);
+        const off = side[i].clone().multiplyScalar((1 - k) * WIRE_GAP * (1 - a - b))
+          .addScaledVector(c.starts[k], a).addScaledVector(c.ends[k], b);
+        out.push(curve.getPointAt(u).add(off));
+      }
+      perWire[k].push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(out), SEG, WIRE_R, 6, false));
+    }
+  }
+  const p = byId.cables, box = new THREE.Box3();
+  perWire.forEach((geos, k) => {
+    const m = p.objs[k];
+    m.geometry.dispose();
+    m.geometry = mergeGeometries(geos);
+    geos.forEach((g) => g.dispose());
+    m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox);
+  });
+  p.objs[3].position.z = pcaOff;  // connectors ride on the header
+  if (t === 0) partBoxes.cables = box;
+}
+
+// ----- moving the horns like the sketch does -----
+// target = the angle the sketch writes; the horn then turns towards it at servo speed.
+const demo = { power: [0, 0, 0, 0, 0, 0], auto: false, unlockAt: 0, mirror: null };
+function resetServos() {
+  demo.power.fill(0); demo.auto = false; demo.unlockAt = 0; demo.mirror = null;
+  for (const s of servos) s.target = 0;
+}
+function setPower(i, v) {  // handlePower(): 0–100 -> 0–90°, then capped at servoMaxAngle
+  demo.power[i] = v;
+  servos[i].target = Math.min(v / 100 * 90, SERVO_MAX[i]);
+}
+function sendUnlock() { servos[6].target = 30; demo.unlockAt = performance.now(); }       // handleUnlock()
+function sendMirror(open) {                                                              // handleMirror()
+  demo.mirror = { from: servos[7].target, to: open ? 170 : 0, at: performance.now() };
+}
+function updateServos(now, dt) {
+  if (demo.auto) for (let i = 0; i < 6; i++) setPower(i, Math.round(50 + 50 * Math.sin(now * 0.0016 + i * 1.05)));
+  if (demo.unlockAt && now - demo.unlockAt >= 500) { servos[6].target = 0; demo.unlockAt = 0; }  // UNLOCK_HOLD_TIME
+  if (demo.mirror) {                                                                      // MIRROR_DURATION
+    const k = Math.min(1, (now - demo.mirror.at) / 2000);
+    servos[7].target = demo.mirror.from + (demo.mirror.to - demo.mirror.from) * k;
+    if (k >= 1) demo.mirror = null;
+  }
+  let moved = false;
+  for (const s of servos) {
+    const d = s.target - s.angle;
+    if (Math.abs(d) < 0.01) continue;
+    s.angle += Math.sign(d) * Math.min(Math.abs(d), SERVO_SPEED * dt);
+    s.pivot.quaternion.setFromAxisAngle(s.axis, THREE.MathUtils.degToRad(s.angle) * (SERVO_REV[s.i] ? -1 : 1));
+    moved = true;
+  }
+  if (moved) S.shadowDirty = true;
+}
+
+// ---------- Explode ----------
+function partOffset(p, t) { return t * (p.rise || 0); }
+const stackRise = (t) => Math.max(...PARTS.map((p) => partOffset(p, t)));  // how far the top floor has risen
+// Floors from the bottom up: each lifts clear of the floor below (bounding boxes, once loaded);
+// 'layer' then spreads parts inside a floor. The cables have no floor: they follow their two ends.
+function computeRises() {
+  const top = (ps) => Math.max(...ps.map((p) => partBoxes[p.id].max.z + p.rise));
+  const bottom = (ps) => Math.min(...ps.map((p) => partBoxes[p.id].min.z));
+  let below = null;
+  for (let L = 0; L <= 9; L++) {
+    const ps = PARTS.filter((p) => p.level === L && p.objs.length);
+    if (!ps.length) continue;
+    const base = below ? Math.max(below.base, top(below.ps) + CLEARANCE - bottom(ps)) : BASE_LIFT;
+    for (const p of ps) p.rise = base + (p.layer || 0) * LAYER_GAP;
+    below = { ps, base };
+  }
+}
+function updateExplode() {
+  const t = S.explodeShown, rise = stackRise(t);
+  if (cables.length && cablesAt !== t) updateCables(t);
+  for (const p of PARTS) if (p.holders) for (const h of p.holders) {
+    h.position.z = partOffset(p, t);
+    if (p.showFrom) h.visible = rise >= p.showFrom;
+  }
+}
+// world-space anchor on the top of a part (with current explode)
+const _v = new THREE.Vector3();
+function partPoint(p, where = 'top', box = null) {
+  const b = box || p.anchorBox || partBoxes[p.id];
+  _v.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, where === 'top' ? b.max.z : (b.min.z + b.max.z) / 2);
+  _v.z += partOffset(p, S.explodeShown);
+  return root.localToWorld(_v.clone());
+}
+
+// ---------- Height rail ----------
+const track = document.getElementById('track'), thumb = document.getElementById('thumb'), fill = document.getElementById('fill');
+const readout = document.getElementById('readout');
+for (let i = 0; i <= 6; i++) { const t = document.createElement('div'); t.className = 'tick'; t.style.bottom = (i / 6 * 100) + '%'; track.appendChild(t); }
+function setExplode(v) {
+  S.explode = Math.min(1, Math.max(0, v));
+  thumb.style.bottom = (S.explode * 100) + '%';
+  fill.style.height = (S.explode * 100) + '%';
+  track.setAttribute('aria-valuenow', Math.round(S.explode * 100));
+}
+function fromPointer(e) { const r = track.getBoundingClientRect(); setExplode(1 - (e.clientY - r.top) / r.height); }
+track.addEventListener('pointerdown', (e) => { track.setPointerCapture(e.pointerId); track.classList.add('dragging'); fromPointer(e); e.preventDefault(); });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) track.addEventListener(ev, () => track.classList.remove('dragging'));
+track.addEventListener('pointermove', (e) => { if (track.hasPointerCapture(e.pointerId)) fromPointer(e); });
+track.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setExplode(S.explode + 0.05);
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setExplode(S.explode - 0.05);
+  else return;
+  e.preventDefault();
+});
+setExplode(0);
+
+// ---------- Look: ghosting, highlight ----------
+const ACCENT = new THREE.Color();
+function readAccent() { ACCENT.set(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0088ff'); }
+readAccent();
+
+// See-through parts swap to a light material: at 6–16 % opacity clearcoat and sheen are invisible,
+// but on iPad they made the ghosted brain (a screen-filling, double-sided body) the slowest thing
+// on screen. Standard + one pass for both sides keeps the same colour and env reflections.
+function ghostMaterial(m) {
+  if (!m.userData.ghostMat) {
+    const s = m.userData.solidMat = m.material;
+    m.userData.ghostMat = new THREE.MeshStandardMaterial({
+      vertexColors: s.vertexColors, color: s.color, side: THREE.DoubleSide, forceSinglePass: true, transparent: true, depthWrite: false,
+      metalness: s.metalness, roughness: s.roughness, envMapIntensity: s.envMapIntensity,
+    });
+  }
+  return m.userData.ghostMat;
+}
+function setPartOpacity(p, a) {
+  for (const m of p.objs || []) {
+    const see = a < 0.999;
+    if (see) m.material = ghostMaterial(m);
+    else if (m.userData.solidMat) m.material = m.userData.solidMat;
+    const mat = m.material;
+    mat.opacity = a;
+    if (m.castShadow === see) S.shadowDirty = true;
+    m.castShadow = !see;
+    m.receiveShadow = !see;  // soft-shadow lookups per pixel, invisible at this opacity
+    m.userData.edges.material.opacity = 0.22 * a;
+    m.renderOrder = see ? 2 : 0;
+  }
+}
+function applyLook() {
+  const tour = S.mode === 'tour' ? TOUR[S.step] : null;
+  const focus = tour && tour.parts.length ? new Set(tour.parts) : null;
+  const ghostShell = tour ? true : S.ghost;
+  for (const p of PARTS) {
+    let a = 1;
+    if (p.ghost && ghostShell) a = 0.1;
+    if (focus && !focus.has(p.id)) a = Math.min(a, p.ghost ? 0.06 : 0.16);
+    setPartOpacity(p, a);
+    // a faint glow only: keep the real part colours readable
+    const hi = S.mode === 'explore' && S.selected === p;
+    for (const m of p.objs || []) {
+      m.material.emissive.copy(hi ? ACCENT : new THREE.Color(0)); m.material.emissiveIntensity = hi ? 0.04 : 0;
+      const em = m.userData.edges.material;
+      em.color.set(hi ? ACCENT : 0x0d1015);
+      if (hi) em.opacity = 0.95;
+    }
+  }
+  for (const c of callouts) c.el.classList.toggle('is-on', S.mode === 'explore' && S.selected === c.part);
+  if (callouts.length) layoutCallouts();  // swap labels right away, not on the next frame
+}
+
+// ---------- Callouts (leader lines + names) ----------
+const svg = document.getElementById('leaders'), labelsEl = document.getElementById('labels');
+const callouts = [];
+// every part gets a callout; which ones show depends on the mode (see visibleCallouts)
+function buildCallouts() {
+  for (const p of PARTS) {
+    const el = document.createElement('div');
+    el.className = 'callout glass';
+    el.addEventListener('click', () => select(p));
+    labelsEl.appendChild(el);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', 4.5);
+    svg.append(path, dot);
+    callouts.push({ part: p, el, path, dot });
+  }
+  renderCalloutText();
+}
+function renderCalloutText() {
+  for (const { part: p, el } of callouts) el.innerHTML = `<span class="ref">${p.ref}</span><b>${P(p, 'name')}</b><small>${P(p, 'sub') || p.en}</small>`;
+}
+const _p = new THREE.Vector3();
+function toScreen(v) { _p.copy(v).project(camera); return { x: (_p.x + 1) / 2 * innerWidth, y: (1 - _p.y) / 2 * innerHeight, z: _p.z }; }
+function modelScreenBounds() {
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of PARTS) {
+    const b = partBoxes[p.id]; if (!b) continue;
+    const off = partOffset(p, S.explodeShown);
+    for (let k = 0; k < 8; k++) {
+      const v = new THREE.Vector3(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, (k & 4 ? b.max.z : b.min.z) + off);
+      const s = toScreen(root.localToWorld(v));
+      minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+    }
+  }
+  return { minX, maxX, cx: (minX + maxX) / 2 };
+}
+// しくみ: only the parts the current step talks about.
+// 観察: none (tapping a part opens its card instead).
+function visibleCallouts() {
+  if (S.mode === 'tour') {
+    const ids = new Set(TOUR[S.step].labels || TOUR[S.step].parts);
+    return callouts.filter((c) => ids.has(c.part.id));
+  }
+  return [];
+}
+function layoutCallouts() {
+  const items = visibleCallouts();
+  for (const c of callouts) { const on = items.includes(c); c.el.hidden = !on; c.path.style.display = c.dot.style.display = on ? '' : 'none'; }
+  if (!items.length) return;
+  const bounds = modelScreenBounds();
+  const placed = items.map((c) => ({ c, a: toScreen(partPoint(c.part)) }));
+  const sides = { left: [], right: [] };
+  for (const it of placed) sides[it.a.x < bounds.cx ? 'left' : 'right'].push(it);
+  // keep one label per side if everything bunched: move the furthest-left of the right group over
+  if (!sides.left.length && sides.right.length > 1) sides.left.push(sides.right.sort((a, b) => a.a.x - b.a.x).shift());
+  if (!sides.right.length && sides.left.length > 1) sides.right.push(sides.left.sort((a, b) => b.a.x - a.a.x).shift());
+  // keep left-hand labels clear of the tour card when it sits on the left
+  const tourBox = !tourEl.hidden ? tourEl.getBoundingClientRect() : null;
+  const margin = tourBox && tourBox.left < 40 ? tourBox.right + 16 : 16, gapX = 36, minGap = 58;
+  const top = 110, bottom = innerHeight - 90;
+  for (const side of ['left', 'right']) {
+    const list = sides[side].sort((a, b) => a.a.y - b.a.y);
+    let lastY = -Infinity;
+    for (const it of list) {
+      const w = it.c.el.offsetWidth, h = it.c.el.offsetHeight;
+      let y = Math.max(top, Math.min(bottom - h, it.a.y - h - 18));
+      if (y < lastY + minGap) y = lastY + minGap;
+      lastY = y;
+      let x = side === 'left' ? Math.min(bounds.minX - gapX - w, it.a.x - 60 - w) : Math.max(bounds.maxX + gapX, it.a.x + 60);
+      x = side === 'left' ? Math.max(margin, Math.min(innerWidth - w - 96, x)) : Math.max(16, Math.min(innerWidth - w - 96, x));
+      it.c.el.style.transform = `translate(${x}px, ${y}px)`;
+      const ey = y + h / 2, ex = side === 'left' ? x + w : x;
+      const knee = side === 'left' ? ex + 18 : ex - 18;
+      it.c.path.setAttribute('d', `M${it.a.x},${it.a.y} L${knee},${ey} L${ex},${ey}`);
+      it.c.dot.setAttribute('cx', it.a.x); it.c.dot.setAttribute('cy', it.a.y);
+    }
+  }
+}
+
+// ---------- Selection ----------
+const sheet = document.getElementById('sheet');
+function renderSheet(p) {
+  document.getElementById('s-ref').textContent = `${p.ref} · ${p.en}`;
+  document.getElementById('s-name').textContent = P(p, 'name');
+  document.getElementById('s-desc').textContent = P(p, 'desc');
+  document.getElementById('s-spec').innerHTML = (P(p, 'spec') || []).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+function select(p) {
+  S.selected = p;
+  if (!p) { sheet.hidden = true; applyLook(); return; }
+  renderSheet(p);
+  sheet.hidden = false;
+  // internal parts sit inside the shell: see-through on so the selection is visible
+  if (!p.ghost && !S.ghost) document.getElementById('t-ghost').click();
+  applyLook();
+}
+document.getElementById('sheet-close').addEventListener('click', () => select(null));
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!down || S.mode !== 'explore') return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
+  down = null;
+  if (moved > 8 || dt > 500) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects([...meshParts.keys()], false).filter((h) => h.object.material.opacity > 0.5 && h.object.parent.visible);
+  select(hits.length ? meshParts.get(hits[0].object) : null);
+});
+
+// ---------- Tools ----------
+const toggle = (id, fn) => { const b = document.getElementById(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); fn(on); }); };
+toggle('t-ghost', (on) => { S.ghost = on; applyLook(); });
+toggle('t-spin', (on) => { controls.autoRotate = on; });
+// 視点を戻す: ease toward the home view for a short while. It must always end — with auto-rotate on
+// the camera never quite reaches the goal, and a fly left running would keep pulling the view back.
+let fly = null;
+const FLY_MS = 1200;
+function flyTo(pos, target) { fly = { pos: pos.clone(), target: target.clone(), until: performance.now() + FLY_MS }; }
+controls.addEventListener('start', () => { fly = null; });  // the user takes over: stop at once
+const viewTargetY = (t) => 110 + stackRise(t) * 0.5;
+const zoomFactor = (t) => 1 + stackRise(t) / 260;
+document.getElementById('t-reset').addEventListener('click', () => {
+  const t = S.explodeShown, target = new THREE.Vector3(0, viewTargetY(t), 0);
+  flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target);
+});
+
+// ---------- Modes & tour ----------
+const tourEl = document.getElementById('tour'), stepsEl = document.getElementById('steps');
+TOUR.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.addEventListener('click', () => goStep(i));
+  stepsEl.appendChild(b);
+});
+// "Try it" controls: send the same OSC values the PC would, and watch the horns move
+const demoEl = document.getElementById('tour-demo');
+function renderDemo() {
+  const kind = TOUR[S.step].demo;
+  demoEl.hidden = !kind;
+  if (!kind) { demoEl.innerHTML = ''; return; }
+  if (kind === 'power') {
+    demoEl.innerHTML = `<div class="demo-head"><span>${ui('demoPower')}</span><button class="chip" id="demo-auto" aria-pressed="${demo.auto}">${ui('demoAuto')}</button></div>
+      <div class="sliders">${[0, 1, 2, 3, 4, 5].map((i) => `<label>#${i}<input type="range" id="demo-pw${i}" min="0" max="100" step="1" value="${demo.power[i]}" aria-label="/power ch${i}"><output id="demo-out${i}"></output></label>`).join('')}</div>
+      <span class="note">${ui('demoPowerNote')}</span>`;
+    document.getElementById('demo-auto').addEventListener('click', (e) => { demo.auto = !demo.auto; e.currentTarget.setAttribute('aria-pressed', demo.auto); });
+    for (let i = 0; i < 6; i++) document.getElementById('demo-pw' + i).addEventListener('input', (e) => {
+      demo.auto = false; document.getElementById('demo-auto').setAttribute('aria-pressed', false); setPower(i, +e.target.value);
+    });
+  } else if (kind === 'unlock') {
+    demoEl.innerHTML = `<div class="buttons"><button class="send" id="demo-unlock">${ui('demoUnlock')}</button></div><span class="note" id="demo-state"></span>`;
+    document.getElementById('demo-unlock').addEventListener('click', sendUnlock);
+  } else if (kind === 'mirror') {
+    demoEl.innerHTML = `<div class="buttons"><button class="send" id="demo-open">${ui('demoMirrorOpen')}</button><button class="send secondary" id="demo-close">${ui('demoMirrorClose')}</button></div><span class="note" id="demo-state"></span>`;
+    document.getElementById('demo-open').addEventListener('click', () => sendMirror(true));
+    document.getElementById('demo-close').addEventListener('click', () => sendMirror(false));
+  }
+  demoShown = -1;
+}
+// numbers next to the controls, refreshed ~10×/s (not every frame: DOM writes are costly on iPad)
+let demoShown = -1;
+function syncDemo(time) {
+  const kind = TOUR[S.step].demo;
+  if (!kind || time - demoShown < 100) return;
+  demoShown = time;
+  if (kind === 'power') for (let i = 0; i < 6; i++) {
+    const r = document.getElementById('demo-pw' + i), o = document.getElementById('demo-out' + i);
+    if (!r) return;
+    if (demo.auto) r.value = demo.power[i];
+    o.textContent = `${demo.power[i]} → ${Math.round(servos[i].angle)}°`;
+  } else {
+    const st = document.getElementById('demo-state'), sv = servos[kind === 'unlock' ? 6 : 7];
+    if (st) st.textContent = `${ui('demoAngle')} ${Math.round(sv.angle)}°`;
+  }
+}
+function renderTourText() {
+  [...stepsEl.children].forEach((b, i) => { b.innerHTML = `<span>${i + 1}</span>${T(i, 'tab')}`; });
+  document.getElementById('tour-title').textContent = T(S.step, 'title');
+  document.getElementById('tour-flow').textContent = T(S.step, 'flow');
+  document.getElementById('tour-text').textContent = T(S.step, 'text');
+  renderDemo();
+}
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('mode-explore').setAttribute('aria-pressed', m === 'explore');
+  document.getElementById('mode-tour').setAttribute('aria-pressed', m === 'tour');
+  document.body.classList.toggle('touring', m === 'tour');
+  tourEl.hidden = m !== 'tour';
+  if (m === 'tour') { select(null); goStep(S.step); } else { flow.visible = false; resetServos(); applyLook(); }
+}
+function goStep(i) {
+  S.step = (i + TOUR.length) % TOUR.length;
+  const s = TOUR[S.step];
+  resetServos();                     // like /init: every horn back to 0°
+  if (s.demo === 'power') demo.auto = true;
+  [...stepsEl.children].forEach((b, k) => k === S.step ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  renderTourText();
+  setExplode(s.explode);
+  applyLook();
+}
+
+// Language switch: re-renders every text in place (keeps view, step and explode as they are)
+function setLang(l) {
+  LANG = l;
+  try { localStorage.setItem('bd-lang', l); } catch (e) { /* storage blocked: choice lasts this visit */ }
+  document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
+  document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
+  document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    if (el.id === 'loading' && el.hidden) return;
+    el.textContent = ui(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', ui(el.dataset.i18nAria)));
+  renderTourText();
+  renderCalloutText();
+  if (S.selected) renderSheet(S.selected);
+  if (callouts.length) layoutCallouts();
+}
+document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
+document.getElementById('lang-zh').addEventListener('click', () => setLang('zh'));
+setLang(LANG);
+document.getElementById('mode-explore').addEventListener('click', () => setMode('explore'));
+document.getElementById('mode-tour').addEventListener('click', () => setMode('tour'));
+document.getElementById('tour-prev').addEventListener('click', () => goStep(S.step - 1));
+document.getElementById('tour-next').addEventListener('click', () => goStep(S.step + 1));
+
+// Signal flow: a line through part centres plus pulses travelling along it. A path that starts at a
+// part made of several units (the 6 servos) branches: one line to / from each unit. Steps that list
+// 'cables' (servo numbers) run their pulses along those drawn leads instead.
+const flow = new THREE.Group(); flow.visible = false; scene.add(flow);
+const FLOW_N = 96, FLOW_MAX = 8, PULSES = 5;
+const flowLines = Array.from({ length: FLOW_MAX }, () => {
+  const line = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(FLOW_N * 3), 3)),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false }));
+  line.renderOrder = 10; flow.add(line);
+  line.pulses = Array.from({ length: PULSES }, () => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true }));
+    s.renderOrder = 11; flow.add(s); return s;
+  });
+  return line;
+});
+function updateFlow(time) {
+  const s = TOUR[S.step];
+  if (S.mode !== 'tour' || !s.path || s.path.length < 2) { flow.visible = false; return; }
+  flow.visible = true;
+  let routes;
+  if (s.cables && cables.length) {
+    // along the real leads: from the ESP32 to each connector, then down the cable to its servo
+    const from = partPoint(byId[s.path[0]], 'mid');
+    routes = s.cables.map((i) => ({ dense: true, pts: [from, ...cables[i].curve.getSpacedPoints(48).reverse().map((v) => root.localToWorld(v))] }));
+  } else {
+    const fork = Math.max(0, s.path.findIndex((id) => byId[id].units));
+    const units = (byId[s.path[fork]].units || [null]).slice(0, FLOW_MAX);
+    routes = units.map((box) => ({ pts: s.path.map((id, i) => partPoint(byId[id], 'mid', i === fork ? box : null)) }));
+  }
+  flowLines.forEach((line, n) => {
+    const on = n < routes.length;
+    line.visible = on; line.pulses.forEach((p) => { p.visible = on; });
+    if (!on) return;
+    const { pts, dense } = routes[n], curvePts = [];
+    for (let i = 0; i < pts.length; i++) {
+      curvePts.push(pts[i]);
+      if (!dense && i < pts.length - 1) { const m = pts[i].clone().lerp(pts[i + 1], 0.5); m.y += 10; curvePts.push(m); }
+    }
+    const curve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal');
+    const arr = line.geometry.attributes.position.array;
+    for (let i = 0; i < FLOW_N; i++) curve.getPoint(i / (FLOW_N - 1)).toArray(arr, i * 3);
+    line.geometry.attributes.position.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+    line.material.color.copy(ACCENT);
+    line.pulses.forEach((p, k) => {
+      const u = ((time * (dense ? 0.00012 : 0.00025)) + k / PULSES + n * 0.13) % 1;  // branches slightly out of step
+      curve.getPoint(u, p.position);
+      p.material.color.copy(ACCENT);
+      p.material.opacity = Math.sin(u * Math.PI);
+    });
+  });
+}
+
+// ---------- Liquid Glass (WebGL) ----------
+// Approach from the community web recreations (kube.io write-up, archisvaze/liquid-glass WebGL
+// renderer): the 3D scene is rendered to a texture, then one full-screen pass draws every visible
+// `.glass` element as a rounded-rect lens over it. The bezel follows a convex squircle profile,
+// refraction offset comes from Snell's law, the body is a mip-blurred, whitened sample, and a
+// directional specular rim sits on the edge. SVG backdrop filters only work in Chromium, so this
+// is what makes the effect real on iPad Safari. Falls back to the CSS blur when unavailable.
+const GLASS_MAX = 16;
+const useGLGlass = renderer.capabilities.isWebGL2 && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
+const hdr = renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float');
+const sceneRT = new THREE.WebGLRenderTarget(1, 1, {
+  samples: 4, type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+  minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
+});
+// The frosted glass samples a blurred copy. Building mipmaps of the full-res scene every frame is
+// costly on iPad, so the scene is box-filtered down to 1/4 size first and the mips are built there.
+// The same LOD bias then lands on the same blur level (a 1/4-size texture starts 2 mip levels down).
+const smallRT = new THREE.WebGLRenderTarget(1, 1, {
+  type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+  minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true,
+});
+const downMat = new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+  uniforms: { uScene: { value: sceneRT.texture }, uTexel: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  // 4 bilinear taps at +-1 texel = the exact average of the 4x4 block under each output pixel
+  fragmentShader: /* glsl */`
+    uniform sampler2D uScene; uniform vec2 uTexel; varying vec2 vUv;
+    void main() {
+      gl_FragColor = 0.25 * (texture2D(uScene, vUv + vec2(-uTexel.x, -uTexel.y)) + texture2D(uScene, vUv + vec2(uTexel.x, -uTexel.y))
+                           + texture2D(uScene, vUv + vec2(-uTexel.x,  uTexel.y)) + texture2D(uScene, vUv + vec2(uTexel.x,  uTexel.y)));
+    }`,
+});
+const downScene = new THREE.Scene();
+const downQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), downMat);
+downQuad.frustumCulled = false;
+downScene.add(downQuad);
+const glassMat = new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false,
+  uniforms: {
+    uScene: { value: sceneRT.texture }, uSmall: { value: smallRT.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uDpr: { value: 1 },
+    uCount: { value: 0 },
+    uRects: { value: Array.from({ length: GLASS_MAX }, () => new THREE.Vector4()) },
+    uRadii: { value: new Array(GLASS_MAX).fill(0) },
+    uIOR: { value: 1.5 }, uThick: { value: 28 }, uBezel: { value: 18 },
+    uTint: { value: 0.32 }, uSpec: { value: 0.55 }, uBlur: { value: 3.2 },
+  },
+  vertexShader: /* glsl */`
+    void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D uScene, uSmall;
+    uniform vec2 uRes; uniform float uDpr; uniform int uCount;
+    uniform vec4 uRects[${GLASS_MAX}]; uniform float uRadii[${GLASS_MAX}];
+    uniform float uIOR, uThick, uBezel, uTint, uSpec, uBlur;
+
+    vec3 toLin(vec3 c) { return pow(c, vec3(2.2)); }
+    // same soft studio backdrop as the CSS body background (sRGB authored, composed in linear)
+    vec3 backdrop(vec2 uv) {
+      vec2 p = vec2(uv.x, 1.0 - uv.y); float asp = uRes.x / uRes.y;
+      float d = length((p - vec2(0.45, 0.45)) * vec2(asp, 1.0) / vec2(0.9 * asp, 0.8));
+      vec3 c = mix(vec3(1.0), vec3(0.961, 0.961, 0.969), smoothstep(0.0, 0.45, d));
+      c = mix(c, vec3(0.910, 0.910, 0.929), smoothstep(0.45, 1.0, d));
+      float b = length((p - vec2(0.7, 0.2)) * vec2(asp, 1.0) / vec2(0.6 * asp, 0.5));
+      c = mix(c, vec3(0.0, 0.533, 1.0), 0.07 * (1.0 - smoothstep(0.0, 0.7, b)));
+      float o = length((p - vec2(0.15, 0.85)) * vec2(asp, 1.0) / vec2(0.5 * asp, 0.45));
+      c = mix(c, vec3(1.0, 0.584, 0.0), 0.05 * (1.0 - smoothstep(0.0, 0.7, o)));
+      return toLin(c);
+    }
+    // scene texture is premultiplied, linear, not yet tone-mapped; bias > 0 reads the blurred copy
+    vec3 sceneAt(vec2 uv, float bias) {
+      uv = clamp(uv, vec2(0.0), vec2(1.0));
+      vec4 s = bias > 0.0 ? texture2D(uSmall, uv, bias) : texture2D(uScene, uv);
+      vec3 c = s.a > 0.0001 ? toneMapping(s.rgb / s.a) : vec3(0.0);
+      return c * s.a + backdrop(uv) * (1.0 - s.a);
+    }
+    float sdRR(vec2 p, vec2 h, float r) {
+      vec2 q = abs(p) - h + r;
+      return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+    }
+    float surf(float t) { float s = 1.0 - t; return pow(1.0 - s * s * s * s, 0.25); }  // convex squircle
+
+    void main() {
+      vec2 frag = gl_FragCoord.xy;
+      vec2 uv = frag / uRes;
+      float best = 1e9, shadow = 1e9, rB = 0.0; vec2 pB = vec2(0.0), hB = vec2(1.0);
+      for (int i = 0; i < ${GLASS_MAX}; i++) {
+        if (i >= uCount) break;
+        vec4 R = uRects[i]; float r = uRadii[i];
+        vec2 p = frag - R.xy;
+        float sd = sdRR(p, R.zw, r);
+        if (sd < best) { best = sd; pB = p; hB = R.zw; rB = r; }
+        shadow = min(shadow, sdRR(p + vec2(0.0, 5.0 * uDpr), R.zw, r));
+      }
+      vec3 col = sceneAt(uv, 0.0);
+      // soft contact shadow below each floating pane
+      float sh = exp(-max(shadow, 0.0) * max(shadow, 0.0) / (420.0 * uDpr * uDpr));
+      col *= 1.0 - 0.09 * sh * step(0.0, best);
+
+      if (best < 0.0) {
+        float dist = -best;
+        float bezel = max(min(uBezel * uDpr, min(rB, min(hB.x, hB.y)) - 1.0), 1.0);
+        float thick = uThick * uDpr;
+        float t = clamp(dist / bezel, 0.0, 1.0);
+        float h = surf(t);
+        float dh = (surf(min(t + 0.002, 1.0)) - h) / 0.002;
+        float slope = atan(dh * thick / bezel);
+        float thetaR = asin(clamp(sin(slope) / uIOR, -1.0, 1.0));
+        float disp = h * thick * (tan(slope) - tan(thetaR));
+        vec2 grad = normalize(vec2(sdRR(pB + vec2(0.5, 0.0), hB, rB) - best, sdRR(pB + vec2(0.0, 0.5), hB, rB) - best) + 1e-6);
+        vec2 off = -grad * disp / uRes;
+        // frosted body: mip blur + a few taps, slight dispersion on the bezel
+        vec2 px = uDpr * 5.0 / uRes;
+        vec3 g = sceneAt(uv + off, uBlur) * 0.4
+               + sceneAt(uv + off + vec2( px.x,  px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2(-px.x,  px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2( px.x, -px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2(-px.x, -px.y), uBlur) * 0.15;
+        float edge = 1.0 - t;
+        g.r = mix(g.r, sceneAt(uv + off * 1.12, uBlur).r, edge * 0.6);
+        g.b = mix(g.b, sceneAt(uv + off * 0.88, uBlur).b, edge * 0.6);
+        float l = dot(g, vec3(0.2126, 0.7152, 0.0722));
+        g = mix(vec3(l), g, 1.35);                       // vibrancy
+        g = mix(g, vec3(1.0), uTint);                     // iOS 27: a little more opaque
+        // specular rim, light from the upper left; the far edge catches a weaker bounce
+        vec2 L = normalize(vec2(-0.45, 0.9));
+        float rim = max(dot(grad, L), 0.0) + 0.35 * max(-dot(grad, L), 0.0);
+        float fall = 1.0 - smoothstep(0.0, bezel * 0.55, dist);
+        g += vec3(pow(rim * fall, 1.6) * uSpec);
+        float line = smoothstep(0.0, 1.2 * uDpr, dist) * (1.0 - smoothstep(1.2 * uDpr, 2.6 * uDpr, dist));
+        g += vec3(line * 0.18);
+        col = mix(col, g, smoothstep(0.0, 1.2 * uDpr, dist));
+      }
+      gl_FragColor = linearToOutputTexel(vec4(col, 1.0));
+    }`,
+});
+const glassScene = new THREE.Scene();
+const glassQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glassMat);
+glassQuad.frustumCulled = false;
+glassScene.add(glassQuad);
+const glassCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const glassRadius = new WeakMap();
+if (useGLGlass) document.body.classList.add('gl-glass');
+
+// read every visible .glass element's rect (device px, y up) into the shader uniforms
+function updateGlassRects() {
+  const dpr = renderer.getPixelRatio(), H = innerHeight, u = glassMat.uniforms;
+  let n = 0;
+  for (const el of document.querySelectorAll('.glass')) {
+    if (n >= GLASS_MAX || !el.getClientRects().length) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    if (!glassRadius.has(el)) glassRadius.set(el, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0);
+    const rad = Math.min(glassRadius.get(el), r.width / 2, r.height / 2);
+    u.uRects.value[n].set((r.left + r.width / 2) * dpr, (H - r.top - r.height / 2) * dpr, r.width / 2 * dpr, r.height / 2 * dpr);
+    u.uRadii.value[n] = rad * dpr;
+    n++;
+  }
+  u.uCount.value = n;
+}
+
+// ---------- Loop ----------
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+  sceneRT.setSize(buf.x, buf.y);
+  smallRT.setSize(Math.ceil(buf.x / 4), Math.ceil(buf.y / 4));
+  downMat.uniforms.uTexel.value.set(1 / buf.x, 1 / buf.y);
+  glassMat.uniforms.uRes.value.copy(buf);
+  glassMat.uniforms.uDpr.value = renderer.getPixelRatio();
+  svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+  svg.setAttribute('width', innerWidth); svg.setAttribute('height', innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lastTime = 0;
+renderer.setAnimationLoop((time) => {
+  const dt = Math.min(0.05, (time - lastTime) / 1000); lastTime = time;
+  if (servos.length) { updateServos(time, dt); if (S.mode === 'tour') syncDemo(time); }
+  const k = reduce ? 1 : 0.14;
+  const prevT = S.explodeShown;
+  S.explodeShown += (S.explode - S.explodeShown) * k;
+  if (Math.abs(S.explode - S.explodeShown) < 1e-4) S.explodeShown = S.explode;
+  // touch the DOM only when the number changes (a write before the glass rect reads forces a layout)
+  const mm = Math.round(stackRise(S.explodeShown));
+  if (mm !== S.readoutMm) { S.readoutMm = mm; readout.innerHTML = `+${mm}<br>mm`; }
+  if (prevT !== S.explodeShown) S.shadowDirty = true;
+  updateExplode();
+  // while the stack grows or shrinks, move the view by the same amount so it stays in frame.
+  // Only the change is applied, so wherever the user has panned / zoomed to is kept.
+  if (!fly && prevT !== S.explodeShown) {
+    const dy = viewTargetY(S.explodeShown) - viewTargetY(prevT);
+    controls.target.y += dy; camera.position.y += dy;
+    const ratio = zoomFactor(S.explodeShown) / zoomFactor(prevT);
+    camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);
+  }
+  if (fly) {
+    camera.position.lerp(fly.pos, 0.12); controls.target.lerp(fly.target, 0.12);
+    if (camera.position.distanceTo(fly.pos) < 0.5 || performance.now() > fly.until) fly = null;
+  }
+  controls.update();
+  updateFlow(time);
+  if (callouts.length) layoutCallouts();
+  if (S.shadowDirty) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; }
+  if (useGLGlass) {
+    renderer.setRenderTarget(sceneRT);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(smallRT);
+    renderer.render(downScene, glassCam);
+    renderer.setRenderTarget(null);
+    updateGlassRects();
+    renderer.render(glassScene, glassCam);
+  } else {
+    renderer.render(scene, camera);
+  }
+});
+</script>
+

@@ -1,0 +1,15 @@
+{
+  "name": "brain-device-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "脳デバイスのSTEPモデルを分解して仕組みを見られるiPad向け3Dビューア",
+  "scripts": {
+    "serve": "node serve.js",
+    "convert": "python step-mesh.py && node step-colors.js && node to-glb.js",
+    "build": "node build-standalone.js app dist && node build-standalone.js headgear/app dist/headgear",
+    "headgear:convert": "cd headgear && python ../step-mesh.py \"source/metaq brain.step\" && node ../step-colors.js \"source/metaq brain.step\" && node ../to-glb.js"
+  },
+  "dependencies": {
+    "occt-import-js": "^0.0.23"
+  }
+}

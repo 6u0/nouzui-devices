@@ -1,0 +1,45 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "brain-viewer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "serve.js",
+        "app",
+        "5173"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "brain-viewer-dist",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "serve.js",
+        "dist",
+        "5174"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "viewer-both",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "serve.js",
+        "app",
+        "5175"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "repo-root",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "serve.js",
+        ".",
+        "5177"
+      ],
+      "port": 5177
+    }
+  ]
+}

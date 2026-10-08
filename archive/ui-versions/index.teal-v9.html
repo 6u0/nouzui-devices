@@ -1,0 +1,827 @@
+<title>Brain Device Inside</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: full-bleed 3D bench; title block top-left, vertical height-explode rail on the right,
+   tool chips bottom-left, part sheet bottom-right. Callouts drawn in a drafting style. */
+:root {
+  --bg: #e4e8ed;
+  --bg-deep: #cfd5dd;
+  --panel: #f8f9fa;
+  --ink: #1b2029;
+  --muted: #5b6472;
+  --line: rgba(27, 32, 41, 0.14);
+  --accent: #0e7c86;          /* teal: callouts, active state, signal flow */
+  --accent-ink: #ffffff;
+  --slate: #3f4551;
+  --font-ui: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+  --shadow: 0 1px 2px rgba(20, 26, 34, 0.08), 0 4px 14px rgba(20, 26, 34, 0.06);
+  color-scheme: light;  /* single light look, regardless of the viewer's theme */
+}
+[hidden] { display: none !important; }
+html[lang="zh-Hant"] { --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+.modes.langs { top: calc(72px + env(safe-area-inset-top, 0px)); }
+.langs button { padding: 8px 12px; min-height: 34px; font-size: 13px; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--ink); font-family: var(--font-ui);
+  background: radial-gradient(120% 90% at 40% 35%, var(--bg) 0%, var(--bg-deep) 100%);
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+#leaders { position: fixed; inset: 0; pointer-events: none; overflow: visible; }
+#leaders path { fill: none; stroke: var(--ink); stroke-width: 1.2; opacity: .75; }
+#leaders circle { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+
+.callout {
+  box-shadow: var(--shadow);
+  position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline;
+  padding: 7px 11px 8px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px;
+  white-space: nowrap; transition: opacity .2s, border-color .2s;
+}
+.callout .ref { font: 600 11px/1 var(--font-mono); color: var(--accent); letter-spacing: .04em; }
+.callout b { font: 600 14px/1.15 var(--font-mono); letter-spacing: .01em; }
+.callout small { grid-column: 2; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.callout.is-on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+.callout[hidden] { display: none !important; }
+
+.titleblock {
+  box-shadow: var(--shadow);
+  position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px;
+  display: grid; gap: 2px; padding: 12px 14px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--r);
+}
+.titleblock .eyebrow { font: 500 10.5px/1 var(--font-mono); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.titleblock h1 { margin: 4px 0 0; font: 700 22px/1.2 var(--font-ui); letter-spacing: .02em; text-wrap: balance; }
+.titleblock .dims { font: 400 11.5px/1.4 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.modes {
+  box-shadow: var(--shadow);
+  position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px;
+  display: flex; padding: 4px; gap: 4px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.modes button {
+  border: 0; background: transparent; color: var(--ink); font: 500 14px/1 var(--font-ui);
+  padding: 11px 18px; border-radius: 6px; cursor: pointer; min-height: 40px;
+}
+.modes button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+/* Vertical height-explode rail */
+.rail {
+  box-shadow: var(--shadow);
+  position: fixed; right: 16px; top: 50%; transform: translateY(-46%);
+  width: 64px; height: min(52vh, 420px); display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
+  justify-items: center; padding: 12px 0; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.rail .cap { font: 500 11px/1.2 var(--font-ui); color: var(--muted); text-align: center; }
+.rail .readout { font: 600 11px/1.2 var(--font-mono); color: var(--ink); font-variant-numeric: tabular-nums; text-align: center; }
+.track { position: relative; width: 44px; height: 100%; touch-action: none; cursor: ns-resize; }
+.track::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; transform: translateX(-50%); border-radius: 4px; background: var(--line); }
+.track .fill { position: absolute; left: 50%; bottom: 0; width: 4px; transform: translateX(-50%); border-radius: 4px; background: var(--accent); }
+.track .tick { position: absolute; left: 50%; width: 14px; height: 1px; transform: translateX(-50%); background: var(--muted); opacity: .5; }
+.track .thumb {
+  position: absolute; left: 50%; width: 40px; height: 40px; transform: translate(-50%, 50%);
+  border-radius: 9px; background: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  display: grid; place-items: center; color: var(--accent-ink);
+}
+.track .thumb svg { width: 18px; height: 18px; }
+.track:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
+
+.tools {
+  position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; max-width: calc(100vw - 32px);
+}
+.chip {
+  box-shadow: var(--shadow);
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  font: 500 14px/1 var(--font-ui); color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+}
+.chip .dot { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--muted); }
+.chip[aria-pressed="true"] .dot { background: var(--accent); border-color: var(--accent); }
+.chip:focus-visible, .modes button:focus-visible, .steps button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sheet {
+  box-shadow: var(--shadow);
+  position: fixed; right: 96px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(360px, calc(100vw - 128px)); padding: 16px 18px 18px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--r);
+  display: grid; gap: 8px;
+}
+.sheet .ref { font: 600 11px/1 var(--font-mono); color: var(--accent); letter-spacing: .08em; }
+.sheet h2 { margin: 0; font: 700 18px/1.3 var(--font-ui); text-wrap: balance; }
+.sheet p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--ink); }
+.sheet dl { margin: 4px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
+.sheet dt { color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; padding-top: 1px; }
+.sheet dd { margin: 0; min-width: 0; }
+.sheet .close { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border: 0; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; border-radius: 8px; }
+.sheet .note { font-size: 11.5px; color: var(--muted); }
+
+.tour {
+  box-shadow: var(--shadow);
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(640px, calc(100vw - 32px)); padding: 14px 16px 16px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--r); display: grid; gap: 10px;
+}
+.steps { display: flex; gap: 6px; overflow-x: auto; }
+.steps button {
+  flex: 1 0 auto; min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: transparent; color: var(--ink); font: 500 13.5px/1 var(--font-ui); cursor: pointer;
+}
+.steps button span { font-family: var(--font-mono); color: var(--muted); margin-right: 6px; }
+.steps button[aria-current="step"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.steps button[aria-current="step"] span { color: var(--accent); }
+.tour h2 { margin: 0; font: 700 17px/1.3 var(--font-ui); }
+.tour p { margin: 0; font-size: 14px; line-height: 1.75; max-width: 62ch; }
+.tour .flowkey { font: 500 12px/1.4 var(--font-mono); color: var(--accent); }
+.tour .nav { display: flex; justify-content: space-between; gap: 8px; }
+.tour .nav button { min-height: 40px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 500 14px/1 var(--font-ui); cursor: pointer; }
+
+.loading { position: fixed; inset: 0; display: grid; place-items: center; font: 500 13px/1 var(--font-mono); color: var(--muted); letter-spacing: .1em; pointer-events: none; }
+
+body.touring .tools, body.touring .sheet {
+  box-shadow: var(--shadow); display: none; }
+@media (min-width: 900px) {
+  .tour {
+  box-shadow: var(--shadow); left: 16px; transform: none; top: calc(124px + env(safe-area-inset-top, 0px)); bottom: auto; width: 330px; }
+  .steps { flex-wrap: wrap; }
+  .steps button { flex: 1 0 40%; }
+}
+
+@media (max-width: 700px) {
+  .modes.langs { top: calc(16px + env(safe-area-inset-top, 0px)); bottom: auto; }
+  .titleblock h1 { font-size: 18px; }
+  .rail {
+  box-shadow: var(--shadow); height: 40vh; width: 56px; right: 12px; }
+  .sheet {
+  box-shadow: var(--shadow); right: 16px; left: 16px; width: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .modes {
+  box-shadow: var(--shadow); top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: 16px; }
+  .tools { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .tour {
+  box-shadow: var(--shadow); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="stage" data-i18n-aria="stage" aria-label="脳デバイスの3Dモデル。ドラッグで回転、ピンチで拡大"></div>
+<svg id="leaders" aria-hidden="true"></svg>
+<div id="labels"></div>
+<div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
+
+<header class="titleblock">
+  <span class="eyebrow">brain device · rev 2</span>
+  <h1 data-i18n="title">脳デバイスの中身</h1>
+  <span class="dims">47.6 × 66.6 × 39.9 mm · 97 solids</span>
+</header>
+
+<nav class="modes" data-i18n-aria="modes" aria-label="表示モード">
+  <button id="mode-explore" aria-pressed="true" data-i18n="explore">観察</button>
+  <button id="mode-tour" aria-pressed="false" data-i18n="tour">しくみ</button>
+</nav>
+
+<nav class="modes langs" aria-label="言語 / 語言">
+  <button id="lang-ja" aria-pressed="true" lang="ja">日本語</button>
+  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
+</nav>
+
+<div class="rail">
+  <div class="cap"><span data-i18n="explode">分解</span><br>↑</div>
+  <div class="track" id="track" role="slider" tabindex="0" data-i18n-aria="track" aria-label="高さ方向の分解量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="fill" id="fill"></div>
+    <div class="thumb" id="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg></div>
+  </div>
+  <div class="readout" id="readout">+0<br>mm</div>
+</div>
+
+<div class="tools" id="tools">
+  <button class="chip" id="t-ghost" aria-pressed="false"><span class="dot"></span><span data-i18n="ghost">外装を透かす</span></button>
+  <button class="chip" id="t-spin" aria-pressed="true"><span class="dot"></span><span data-i18n="spin">自動回転</span></button>
+  <button class="chip" id="t-reset" data-i18n="reset">視点を戻す</button>
+</div>
+
+<aside class="sheet" id="sheet" hidden>
+  <button class="close" id="sheet-close" data-i18n-aria="close" aria-label="閉じる">×</button>
+  <span class="ref" id="s-ref"></span>
+  <h2 id="s-name"></h2>
+  <p id="s-desc"></p>
+  <dl id="s-spec"></dl>
+</aside>
+
+<section class="tour" id="tour" hidden>
+  <div class="steps" id="steps"></div>
+  <h2 id="tour-title"></h2>
+  <span class="flowkey" id="tour-flow"></span>
+  <p id="tour-text"></p>
+  <div class="nav"><button id="tour-prev" data-i18n="prev">← 前へ</button><button id="tour-next" data-i18n="next">次へ →</button></div>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ---------- Part catalogue (mesh indices come from the STEP conversion) ----------
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+// layer: how many "floors" the part rises when the height slider is at 100%
+const PARTS = [
+  { id: 'shell', ref: 'H1', name: 'シェル（本体外装）', en: 'shell', meshes: [115], stack: 'shell', ghost: true,
+    desc: '全体を受け止める土台の外装。内部の部品はすべてこの上に積み重なっています。', spec: [['材質', '3Dプリント樹脂（CAD上の外観設定）']] },
+  { id: 'm5', ref: 'U1', name: 'M5StickS3', en: 'M5StickS3', sub: '制御・頭脳（ESP32-S3）', meshes: [4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17], layer: 0, callout: true,
+    desc: 'デバイスの頭脳。Wi‑Fiで外部のPCとつながり、OSCメッセージでやりとりします。PCから指示されるフェーズ（0〜4）によって、センサーを読むか・振動させるかが切り替わります。',
+    spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9002）'], ['入力', 'ホール GPIO10 / 圧力 GPIO1–4 / ボタン GPIO11'], ['出力', '振動PWM GPIO8・GPIO7 / LED 赤 GPIO0・緑 GPIO43'], ['監視', 'LiPo電圧 GPIO5 / 充電中 GPIO6'], ['内蔵IMU', '衝撃検知（フェーズ4）'], ['ボタン', '1回: 画面切替 / 2回: 充電専用モード / 10秒長押し: 電源OFF']] },
+  { id: 'screws', ref: 'S1', name: 'M2キャップスクリュー ×2', en: 'M2 cap screw 8mm', meshes: [13, 14], layer: 0.4,
+    desc: '内部部品を固定するM2のネジ（長さ8mm）。', spec: [['規格', 'M2 × 8mm']] },
+  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'lipo battery', meshes: [0], layer: 1, sub: '電源（GPIO5で電圧監視）',
+    desc: 'M5StickS3本体とは別の充電式リチウムポリマー電池。電圧はM5StickS3が常に監視していて、1秒ごとにPCへ送られます。', spec: [['電圧監視', 'GPIO5（1/2に分圧して読み、×2で復元・10回平均）'], ['低残量', '3.55 V 未満で赤LED点滅'], ['PCへ送信', '/battery/lipo（1秒ごと）'], ['外形', '約 8 × 34 × 20 mm']] },
+  { id: 'hallcase', ref: 'H2', name: 'ホールセンサーケース', en: 'hall_sensor_case', meshes: [114], layer: 1.3, ghost: false,
+    desc: 'ホールセンサーまわりを保持する縦向きの樹脂パーツ。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'socket', ref: 'J1', name: '8ピンソケット', en: 'pinsocket_8', sub: 'M5StickS3との接続', meshes: [15], layer: 1.6,
+    desc: 'M5StickS3のピンヘッダを受けるソケット。ここから内部の基板やセンサーへ信号がつながります。', spec: [['ピン数', '8']] },
+  { id: 'vibrator', ref: 'M1', name: '振動モーター', en: 'vibrator', meshes: [1], layer: 2, sub: '出力（心拍パターン）',
+    desc: 'DRV8833から電流を受けて回る振動モーター。PCから /heartrate を受け取るたびに、心拍のような約0.33秒の振動を1回出します。', spec: [['波形', '0→220→220→130→40→80→0（PWM値 / 255）'], ['長さ', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
+  { id: 'chargerbase', ref: 'H3', name: '充電モジュール台座', en: 'charger_substrare', meshes: [2], layer: 2,
+    desc: '充電モジュールを載せるための台座パーツ。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'drvcase', ref: 'H4', name: 'ドライバーケース', en: 'diver_case', meshes: [113], layer: 2.7,
+    desc: 'モータードライバー基板とホールセンサーを載せるケース。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'drv', ref: 'U2', name: 'DRV8833', en: 'DRV8833', sub: 'モータードライバー', meshes: [18], layer: 3.4, callout: true,
+    desc: 'マイコンの弱い信号を、モーターを回せる大きな電流に変える「増幅役」。M5StickS3のピンから直接モーターを回すことはできないため、この基板を間に挟みます。',
+    spec: [['IC', 'TI DRV8833（デュアルHブリッジ）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← LOW固定（回転は一方向）'], ['出力', '振動モーターへ']] },
+  { id: 'tp', ref: 'U3', name: 'TP4057', en: 'TP4057 Mini', sub: '充電モジュール（USB-C）', meshes: range(19, 112), layer: 3.4, callout: true,
+    desc: 'USB-Cから給電してLiPoバッテリーを充電する小型モジュール。充電中を示すCHRG信号をM5StickS3が読み取り、LiPoが「充電中」か「満充電」かを判定します。',
+    spec: [['IC', 'TP4057 リニア充電IC'], ['入力', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中、10サンプルでノイズ除去）'], ['判定', 'M5に給電中（VBUS ≥ 4.0 V）のときだけ']] },
+  { id: 'hall', ref: 'U4', name: 'ホールセンサー', en: 'hall_sensor', meshes: [3], layer: 4, sub: '入力（GPIO10）',
+    desc: '磁石を検出するセンサー。フェーズ3のとき、出力がLOWからHIGHに切り替わった瞬間にM5StickS3がPCへ /magnet を送ります。', spec: [['接続', 'GPIO10（デジタル入力・プルアップ）'], ['電源', 'M5StickS3 の EXT 5V 出力'], ['PCへ送信', '/magnet 1（フェーズ3）']] },
+  { id: 'arm2', ref: 'H5', name: 'アーム2（上部カバー前）', en: 'arm2', meshes: [116], stack: 'arms', ghost: true,
+    desc: '頭頂部を覆うカーブしたカバーの前側。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'arm1', ref: 'H6', name: 'アーム1（上部カバー後）', en: 'arm1', meshes: [117], stack: 'arms', ghost: true,
+    desc: '頭頂部を覆うカーブしたカバーの後ろ側。', spec: [['材質', '3Dプリント樹脂']] },
+];
+const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
+// Explode order, top to bottom: arms > shell > internal parts > M5.
+// Internal parts rise LAYER_GAP mm per layer; 'shell' then lifts clear of the internals,
+// and 'arms' lift clear of the shell (computed from the bounding boxes once loaded).
+const LAYER_GAP = 12;  // mm per layer at 100%
+const CLEARANCE = 8;   // mm between stacked groups at 100%
+let MAX_OFFSET = 1;    // largest rise at 100%, for the readout and camera follow
+
+// Surface finish by original STEP colour
+const FINISH = {
+  f3cb7c: { metalness: 1, roughness: 0.26 },      // gold-plated pins / pads
+  f4e5a7: { metalness: 1, roughness: 0.3 },
+  d1ccc0: { metalness: 0.9, roughness: 0.3 },     // tin / steel
+  cbcbcb: { metalness: 0.95, roughness: 0.28 },   // screws
+  ffffff: { metalness: 0.85, roughness: 0.3 },
+  f6f6f3: { metalness: 0.8, roughness: 0.32 },
+  cbcbad: { metalness: 0, roughness: 0.55 },      // grove socket plastic
+  b39657: { metalness: 0, roughness: 0.5 },       // ceramic
+  191919: { metalness: 0, roughness: 0.32, clearcoat: 0.4 },
+  434343: { metalness: 0, roughness: 0.45 },
+  cad1ee: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // PCB w/ solder mask
+  f7e9d1: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 },
+  db620b: { metalness: 0, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 }, // M5 body
+  a0a0a0: { metalness: 0, roughness: 0.72 },  // printed parts
+  '3f3f3f': { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 }, // printed carbon shell
+};
+const MESH_FINISH = { 0: { metalness: 0.55, roughness: 0.32 }, 1: { metalness: 0.9, roughness: 0.25 }, 3: { metalness: 0.1, roughness: 0.4, clearcoat: 0.5 } };
+
+// ---------- How-it-works tour ----------
+const TOUR = [
+  { tab: '全体', labels: ['m5', 'hall', 'vibrator', 'battery'], title: '全体の構成', flow: 'PC ⇄ Wi‑Fi / OSC ⇄ M5StickS3', parts: [], explode: 0.55, ghost: true,
+    text: 'M5StickS3がWi‑Fi経由でPCとOSCメッセージをやりとりします。PCが /phase でフェーズ（0〜4）を指示し、デバイスはフェーズに応じてセンサーの値を送ったり、振動したりします。' },
+  { tab: '通信', labels: ['m5'], title: 'PCとのやりとり（OSC）', flow: 'PC → /phase /heartrate /battery /init /reboot', path: [], parts: ['m5'], explode: 0.5,
+    text: '起動するとWi‑Fiにつながり、PCへ /ask を送ります。以降は1秒ごとに電池の状態（/battery/m5、/battery/lipo）を送信します。フェーズ3では圧力とホールセンサー、フェーズ4では圧力と衝撃をPCへ送ります。' },
+  { tab: '磁石', labels: ['hall', 'socket', 'm5'], title: '入力：ホールセンサー', flow: 'ホールセンサー → GPIO10 → M5StickS3 → /magnet', path: ['hall', 'socket', 'm5'], parts: ['hall', 'socket', 'm5'], explode: 0.65,
+    text: 'フェーズ3のとき、ホールセンサーの出力がLOWからHIGHに切り替わった瞬間に、M5StickS3がPCへ /magnet を送ります。' },
+  { tab: '圧力', labels: ['m5'], title: '入力：圧力センサー（4ch）', flow: 'GPIO1–4 → 6chに補間 → /power（20msごと）', path: [], parts: ['m5', 'socket'], explode: 0.5,
+    text: 'フェーズ3と4のあいだ、4つの圧力センサーを20msごとに読み取ります。隣どうしを少し混ぜ合わせて6chに広げ、0〜100の値として /power で送ります。圧力センサー本体はこのCADモデルには含まれていません。' },
+  { tab: '衝撃', labels: ['m5'], title: '入力：衝撃（内蔵IMU）', flow: 'IMU → 加速度の変化 > 5G → /gravity', path: [], parts: ['m5'], explode: 0.5,
+    text: 'フェーズ4では、M5StickS3内蔵のIMUで加速度の大きさを見ています。前回の値から5G以上変化すると、PCへ /gravity を1回だけ送ります（フェーズ開始から0.5秒間は無視）。' },
+  { tab: '振動', labels: ['m5', 'drv', 'vibrator'], title: '出力：心拍の振動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 振動モーター', path: ['m5', 'drv', 'vibrator'], parts: ['m5', 'drv', 'vibrator', 'socket'], explode: 0.65,
+    text: 'フェーズ2以上でPCから /heartrate 1 を受け取ると、約0.33秒の振動を1回出します。強さ（PWM値）は 0→220→220→130→40→80→0 と変化します。PWMはGPIO8から1kHzで出力され、DRV8833で増幅されて振動モーターを回します。' },
+  { tab: '電源', labels: ['tp', 'battery', 'm5'], title: '電源：充電と電池の監視', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電圧 → GPIO5', path: ['tp', 'battery', 'm5'], parts: ['tp', 'battery', 'chargerbase', 'm5'], explode: 0.65,
+    text: 'TP4057がUSB-CからLiPoを充電します。M5StickS3はLiPoの電圧（GPIO5）と充電中かどうか（GPIO6）を常に監視しています。LiPoが3.55V未満か、本体の残量が20%未満になると、赤LEDが点滅します。ボタンを2回押すと、Wi‑Fiや振動を止めた充電専用モードになります。' },
+];
+
+// ---------- Language: 日本語 (default, in PARTS/TOUR above) / 繁體中文（台灣） ----------
+const UI = {
+  ja: {
+    title: '脳デバイスの中身', loading: 'LOADING MODEL…', loadFail: 'モデルを読み込めませんでした。ページを再読み込みしてください。',
+    explore: '観察', tour: 'しくみ', explode: '分解', ghost: '外装を透かす', spin: '自動回転', reset: '視点を戻す',
+    prev: '← 前へ', next: '次へ →',
+    stage: '脳デバイスの3Dモデル。ドラッグで回転、ピンチで拡大', modes: '表示モード', track: '高さ方向の分解量', close: '閉じる',
+  },
+  zh: {
+    title: '腦裝置的內部', loading: '模型載入中…', loadFail: '無法載入模型，請重新整理頁面。',
+    explore: '觀察', tour: '運作原理', explode: '分解', ghost: '外殼透視', spin: '自動旋轉', reset: '重設視角',
+    prev: '← 上一步', next: '下一步 →',
+    stage: '腦裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉',
+  },
+};
+const ZH_PARTS = {
+  shell: { name: '外殼（本體）', desc: '承載整體的底座外殼。內部零件全部疊放在它上面。', spec: [['材質', '3D 列印樹脂（CAD 外觀設定）']] },
+  m5: { sub: '控制・大腦（ESP32-S3）',
+    desc: '裝置的大腦。透過 Wi‑Fi 連線到外部電腦，以 OSC 訊息互相溝通。依照電腦指定的階段（0〜4），切換要讀取感測器還是產生震動。',
+    spec: [['通訊', 'Wi‑Fi + OSC（UDP 接收 9000／傳送 9002）'], ['輸入', '霍爾 GPIO10／壓力 GPIO1–4／按鈕 GPIO11'], ['輸出', '震動 PWM GPIO8・GPIO7／LED 紅 GPIO0・綠 GPIO43'], ['監測', 'LiPo 電壓 GPIO5／充電中 GPIO6'], ['內建 IMU', '撞擊偵測（階段 4）'], ['按鈕', '按 1 次：切換畫面／按 2 次：僅充電模式／長按 10 秒：關機']] },
+  screws: { name: 'M2 內六角螺絲 ×2', desc: '固定內部零件的 M2 螺絲（長 8mm）。', spec: [['規格', 'M2 × 8mm']] },
+  battery: { name: 'LiPo 電池', sub: '電源（以 GPIO5 監測電壓）',
+    desc: '與 M5StickS3 本體分開的鋰聚合物充電電池。M5StickS3 會持續監測它的電壓，並每秒傳送給電腦。',
+    spec: [['電壓監測', 'GPIO5（分壓成 1/2 讀取，×2 還原，取 10 次平均）'], ['低電量', '低於 3.55 V 時紅色 LED 閃爍'], ['傳送給電腦', '/battery/lipo（每秒）'], ['外形', '約 8 × 34 × 20 mm']] },
+  hallcase: { name: '霍爾感測器外殼', desc: '固定霍爾感測器周邊的直立樹脂零件。', spec: [['材質', '3D 列印樹脂']] },
+  socket: { name: '8 針插座', sub: '與 M5StickS3 連接', desc: '承接 M5StickS3 排針的插座。訊號從這裡連到內部的電路板和感測器。', spec: [['針數', '8']] },
+  vibrator: { name: '震動馬達', sub: '輸出（心跳模式）',
+    desc: '由 DRV8833 供電而轉動的震動馬達。每次從電腦收到 /heartrate，就輸出一次約 0.33 秒、像心跳一樣的震動。',
+    spec: [['波形', '0→220→220→130→40→80→0（PWM 值／255）'], ['長度', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
+  chargerbase: { name: '充電模組底座', desc: '放置充電模組的底座零件。', spec: [['材質', '3D 列印樹脂']] },
+  drvcase: { name: '驅動器外殼', desc: '放置馬達驅動板和霍爾感測器的外殼。', spec: [['材質', '3D 列印樹脂']] },
+  drv: { sub: '馬達驅動器',
+    desc: '把微控制器微弱的訊號，轉換成足以驅動馬達的大電流的「放大器」。M5StickS3 的腳位無法直接驅動馬達，所以中間要接這塊板子。',
+    spec: [['IC', 'TI DRV8833（雙 H 橋）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← 固定 LOW（單向旋轉）'], ['輸出', '接到震動馬達']] },
+  tp: { sub: '充電模組（USB-C）',
+    desc: '從 USB-C 供電、為 LiPo 電池充電的小型模組。M5StickS3 讀取表示充電中的 CHRG 訊號，判斷 LiPo 是「充電中」還是「已充飽」。',
+    spec: [['IC', 'TP4057 線性充電 IC'], ['輸入', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中，以 10 次取樣去除雜訊）'], ['判斷', '僅在 M5 供電中（VBUS ≥ 4.0 V）時']] },
+  hall: { name: '霍爾感測器', sub: '輸入（GPIO10）',
+    desc: '偵測磁鐵的感測器。在階段 3 時，輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。',
+    spec: [['連接', 'GPIO10（數位輸入・上拉）'], ['電源', 'M5StickS3 的 EXT 5V 輸出'], ['傳送給電腦', '/magnet 1（階段 3）']] },
+  arm2: { name: '臂件 2（上蓋前側）', desc: '覆蓋頭頂的弧形外蓋前側。', spec: [['材質', '3D 列印樹脂']] },
+  arm1: { name: '臂件 1（上蓋後側）', desc: '覆蓋頭頂的弧形外蓋後側。', spec: [['材質', '3D 列印樹脂']] },
+};
+const ZH_TOUR = [
+  { tab: '全體', title: '整體構成', flow: '電腦 ⇄ Wi‑Fi / OSC ⇄ M5StickS3',
+    text: 'M5StickS3 透過 Wi‑Fi 與電腦交換 OSC 訊息。電腦用 /phase 指定階段（0〜4），裝置會依照階段傳送感測器數值，或產生震動。' },
+  { tab: '通訊', title: '與電腦的溝通（OSC）', flow: '電腦 → /phase /heartrate /battery /init /reboot',
+    text: '開機後連上 Wi‑Fi，並向電腦傳送 /ask。之後每秒傳送電池狀態（/battery/m5、/battery/lipo）。階段 3 會傳送壓力與霍爾感測器，階段 4 會傳送壓力與撞擊。' },
+  { tab: '磁鐵', title: '輸入：霍爾感測器', flow: '霍爾感測器 → GPIO10 → M5StickS3 → /magnet',
+    text: '在階段 3 時，霍爾感測器的輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。' },
+  { tab: '壓力', title: '輸入：壓力感測器（4ch）', flow: 'GPIO1–4 → 補成 6ch → /power（每 20ms）',
+    text: '在階段 3 和 4 期間，每 20ms 讀取 4 個壓力感測器。把相鄰的數值稍微混合、擴展成 6ch，再以 0〜100 的數值透過 /power 傳送。壓力感測器本身不包含在這個 CAD 模型中。' },
+  { tab: '撞擊', title: '輸入：撞擊（內建 IMU）', flow: 'IMU → 加速度變化 > 5G → /gravity',
+    text: '在階段 4，用 M5StickS3 內建的 IMU 監看加速度大小。與上一次的值相比變化超過 5G 時，只傳送一次 /gravity 給電腦（階段開始後 0.5 秒內忽略）。' },
+  { tab: '震動', title: '輸出：心跳震動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 震動馬達',
+    text: '在階段 2 以上從電腦收到 /heartrate 1 時，會輸出一次約 0.33 秒的震動。強度（PWM 值）依 0→220→220→130→40→80→0 變化。PWM 從 GPIO8 以 1kHz 輸出，經 DRV8833 放大後驅動震動馬達。' },
+  { tab: '電源', title: '電源：充電與電池監測', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電壓 → GPIO5',
+    text: 'TP4057 透過 USB-C 為 LiPo 充電。M5StickS3 會持續監測 LiPo 的電壓（GPIO5）以及是否正在充電（GPIO6）。LiPo 低於 3.55V，或本體電量低於 20% 時，紅色 LED 會閃爍。按鈕連按 2 次，會進入停止 Wi‑Fi 和震動的僅充電模式。' },
+];
+let LANG = 'ja';
+try {
+  const saved = localStorage.getItem('bd-lang');
+  LANG = saved === 'zh' || saved === 'ja' ? saved : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ja';
+} catch (e) { /* storage blocked: keep default */ }
+const ui = (k) => UI[LANG][k];
+const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
+const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
+
+// ---------- Renderer / scene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 1, 3000);
+const HOME = { pos: new THREE.Vector3(150, 120, 170), target: new THREE.Vector3(0, 20, 0) };
+camera.position.copy(HOME.pos);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME.target);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 60;
+controls.maxDistance = 600;
+controls.autoRotateSpeed = 1.2;
+controls.autoRotate = true;  // on at start; the 自動回転 chip toggles it
+
+const key = new THREE.DirectionalLight(0xfff6ea, 1.8);
+key.position.set(80, 160, 90);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, near: 10, far: 400 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.25;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd4ff, 0.9);
+rim.position.set(-120, 60, -100);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.35));
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.ShadowMaterial({ opacity: 0.18 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.4;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// CAD is Z-up: rotate so CAD Z becomes the scene's height axis; centre the footprint.
+const root = new THREE.Group();
+root.rotation.x = -Math.PI / 2;
+root.position.set(0, 0, -6.1);
+scene.add(root);
+
+// ---------- State ----------
+const S = { explode: 0, explodeShown: 0, ghost: false, selected: null, mode: 'explore', step: 0 };
+const meshParts = new Map(); // mesh -> part
+const partBoxes = {};        // part id -> Box3 in root-local (assembled)
+
+// ---------- Load ----------
+// model.json = { glb: base64 } — decoded here and parsed in memory
+const loadFail = (err) => {
+  document.getElementById('loading').textContent = ui('loadFail');
+  console.error(err);
+};
+fetch('model.json').then((r) => r.json()).then(({ glb }) => {
+  const bytes = Uint8Array.from(atob(glb), (c) => c.charCodeAt(0));
+  new GLTFLoader().parse(bytes.buffer, '', onModel, loadFail);
+}).catch(loadFail);
+function onModel(gltf) {
+  const meshes = [];
+  gltf.scene.traverse((o) => { if (o.isMesh) meshes[+o.name.slice(1)] = o; });
+  for (const p of PARTS) {
+    p.objs = [];
+    const box = new THREE.Box3();
+    for (const i of p.meshes) {
+      const m = meshes[i]; if (!m) continue;
+      const hex = (m.userData && m.userData.c) || (m.parent && m.parent.userData && m.parent.userData.c) || '';
+      const f = { ...(FINISH[hex] || { metalness: 0, roughness: 0.5 }), ...(MESH_FINISH[i] || {}) };
+      m.material = new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 1, ...f });
+      m.castShadow = true; m.receiveShadow = true;
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 32),
+        new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
+      edges.raycast = () => {};
+      m.add(edges);
+      m.userData.edges = edges;
+      const holder = new THREE.Group();
+      holder.add(m);
+      root.add(holder);
+      p.objs.push(m);
+      meshParts.set(m, p);
+    }
+    p.holders = p.objs.map((m) => m.parent);
+    partBoxes[p.id] = box;
+  }
+  computeRises();
+  document.getElementById('loading').hidden = true;
+  buildCallouts();
+  applyLook();
+}
+
+// ---------- Explode ----------
+function partOffset(p, t) { return t * (p.rise || 0); }
+function computeRises() {
+  const top = (ps) => Math.max(...ps.map((p) => partBoxes[p.id].max.z + p.rise));
+  const bottom = (ps) => Math.min(...ps.map((p) => partBoxes[p.id].min.z));
+  const inner = PARTS.filter((p) => !p.stack), shell = PARTS.filter((p) => p.stack === 'shell'), arms = PARTS.filter((p) => p.stack === 'arms');
+  for (const p of inner) p.rise = p.layer * LAYER_GAP;
+  const shellRise = top(inner) + CLEARANCE - bottom(shell);
+  for (const p of shell) p.rise = shellRise;
+  const armRise = top(shell) + CLEARANCE - bottom(arms);
+  for (const p of arms) p.rise = armRise;
+  MAX_OFFSET = Math.max(...PARTS.map((p) => p.rise));
+}
+function updateExplode() {
+  const t = S.explodeShown;
+  for (const p of PARTS) if (p.holders) for (const h of p.holders) h.position.z = partOffset(p, t);
+}
+// world-space anchor on the top of a part (with current explode)
+const _v = new THREE.Vector3();
+function partPoint(p, where = 'top') {
+  const b = partBoxes[p.id];
+  _v.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, where === 'top' ? b.max.z : (b.min.z + b.max.z) / 2);
+  _v.z += partOffset(p, S.explodeShown);
+  return root.localToWorld(_v.clone());
+}
+
+// ---------- Height rail ----------
+const track = document.getElementById('track'), thumb = document.getElementById('thumb'), fill = document.getElementById('fill');
+const readout = document.getElementById('readout');
+for (let i = 0; i <= 6; i++) { const t = document.createElement('div'); t.className = 'tick'; t.style.bottom = (i / 6 * 100) + '%'; track.appendChild(t); }
+function setExplode(v) {
+  S.explode = Math.min(1, Math.max(0, v));
+  thumb.style.bottom = (S.explode * 100) + '%';
+  fill.style.height = (S.explode * 100) + '%';
+  track.setAttribute('aria-valuenow', Math.round(S.explode * 100));
+}
+function fromPointer(e) { const r = track.getBoundingClientRect(); setExplode(1 - (e.clientY - r.top) / r.height); }
+track.addEventListener('pointerdown', (e) => { track.setPointerCapture(e.pointerId); fromPointer(e); e.preventDefault(); });
+track.addEventListener('pointermove', (e) => { if (track.hasPointerCapture(e.pointerId)) fromPointer(e); });
+track.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setExplode(S.explode + 0.05);
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setExplode(S.explode - 0.05);
+  else return;
+  e.preventDefault();
+});
+setExplode(0);
+
+// ---------- Look: ghosting, highlight ----------
+const ACCENT = new THREE.Color();
+function readAccent() { ACCENT.set(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0e7c86'); }
+readAccent();
+
+function setPartOpacity(p, a) {
+  for (const m of p.objs || []) {
+    const mat = m.material, see = a < 0.999;
+    mat.transparent = see; mat.opacity = a; mat.depthWrite = !see;
+    m.castShadow = !see;
+    m.userData.edges.material.opacity = 0.22 * a;
+    m.renderOrder = see ? 2 : 0;
+  }
+}
+function applyLook() {
+  const tour = S.mode === 'tour' ? TOUR[S.step] : null;
+  const focus = tour && tour.parts.length ? new Set(tour.parts) : null;
+  const ghostShell = tour ? true : S.ghost;
+  for (const p of PARTS) {
+    let a = 1;
+    if (p.ghost && ghostShell) a = 0.1;
+    if (focus && !focus.has(p.id)) a = Math.min(a, p.ghost ? 0.06 : 0.16);
+    setPartOpacity(p, a);
+    // a faint glow only: keep the real part colours readable
+    const hi = S.mode === 'explore' && S.selected === p;
+    for (const m of p.objs || []) {
+      m.material.emissive.copy(hi ? ACCENT : new THREE.Color(0)); m.material.emissiveIntensity = hi ? 0.04 : 0;
+      const em = m.userData.edges.material;
+      em.color.set(hi ? ACCENT : 0x0d1015);
+      if (hi) em.opacity = 0.95;
+    }
+  }
+  for (const c of callouts) c.el.classList.toggle('is-on', S.mode === 'explore' && S.selected === c.part);
+  if (callouts.length) layoutCallouts();  // swap labels right away, not on the next frame
+}
+
+// ---------- Callouts (leader lines + names) ----------
+const svg = document.getElementById('leaders'), labelsEl = document.getElementById('labels');
+const callouts = [];
+// every part gets a callout; which ones show depends on the mode (see visibleCallouts)
+function buildCallouts() {
+  for (const p of PARTS) {
+    const el = document.createElement('div');
+    el.className = 'callout';
+    el.addEventListener('click', () => select(p));
+    labelsEl.appendChild(el);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', 4.5);
+    svg.append(path, dot);
+    callouts.push({ part: p, el, path, dot });
+  }
+  renderCalloutText();
+}
+function renderCalloutText() {
+  for (const { part: p, el } of callouts) el.innerHTML = `<span class="ref">${p.ref}</span><b>${P(p, 'name')}</b><small>${P(p, 'sub') || p.en}</small>`;
+}
+const _p = new THREE.Vector3();
+function toScreen(v) { _p.copy(v).project(camera); return { x: (_p.x + 1) / 2 * innerWidth, y: (1 - _p.y) / 2 * innerHeight, z: _p.z }; }
+function modelScreenBounds() {
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of PARTS) {
+    const b = partBoxes[p.id]; if (!b) continue;
+    const off = partOffset(p, S.explodeShown);
+    for (let k = 0; k < 8; k++) {
+      const v = new THREE.Vector3(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, (k & 4 ? b.max.z : b.min.z) + off);
+      const s = toScreen(root.localToWorld(v));
+      minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+    }
+  }
+  return { minX, maxX, cx: (minX + maxX) / 2 };
+}
+// しくみ: only the parts the current step talks about.
+// 観察: none (tapping a part opens its card instead).
+function visibleCallouts() {
+  if (S.mode === 'tour') {
+    const ids = new Set(TOUR[S.step].labels || TOUR[S.step].parts);
+    return callouts.filter((c) => ids.has(c.part.id));
+  }
+  return [];
+}
+function layoutCallouts() {
+  const items = visibleCallouts();
+  for (const c of callouts) { const on = items.includes(c); c.el.hidden = !on; c.path.style.display = c.dot.style.display = on ? '' : 'none'; }
+  if (!items.length) return;
+  const bounds = modelScreenBounds();
+  const placed = items.map((c) => ({ c, a: toScreen(partPoint(c.part)) }));
+  const sides = { left: [], right: [] };
+  for (const it of placed) sides[it.a.x < bounds.cx ? 'left' : 'right'].push(it);
+  // keep one label per side if everything bunched: move the furthest-left of the right group over
+  if (!sides.left.length && sides.right.length > 1) sides.left.push(sides.right.sort((a, b) => a.a.x - b.a.x).shift());
+  if (!sides.right.length && sides.left.length > 1) sides.right.push(sides.left.sort((a, b) => b.a.x - a.a.x).shift());
+  // keep left-hand labels clear of the tour card when it sits on the left
+  const tourBox = !tourEl.hidden ? tourEl.getBoundingClientRect() : null;
+  const margin = tourBox && tourBox.left < 40 ? tourBox.right + 16 : 16, gapX = 36, minGap = 58;
+  const top = 110, bottom = innerHeight - 90;
+  for (const side of ['left', 'right']) {
+    const list = sides[side].sort((a, b) => a.a.y - b.a.y);
+    let lastY = -Infinity;
+    for (const it of list) {
+      const w = it.c.el.offsetWidth, h = it.c.el.offsetHeight;
+      let y = Math.max(top, Math.min(bottom - h, it.a.y - h - 18));
+      if (y < lastY + minGap) y = lastY + minGap;
+      lastY = y;
+      let x = side === 'left' ? Math.min(bounds.minX - gapX - w, it.a.x - 60 - w) : Math.max(bounds.maxX + gapX, it.a.x + 60);
+      x = side === 'left' ? Math.max(margin, Math.min(innerWidth - w - 96, x)) : Math.max(16, Math.min(innerWidth - w - 96, x));
+      it.c.el.style.transform = `translate(${x}px, ${y}px)`;
+      const ey = y + h / 2, ex = side === 'left' ? x + w : x;
+      const knee = side === 'left' ? ex + 18 : ex - 18;
+      it.c.path.setAttribute('d', `M${it.a.x},${it.a.y} L${knee},${ey} L${ex},${ey}`);
+      it.c.dot.setAttribute('cx', it.a.x); it.c.dot.setAttribute('cy', it.a.y);
+    }
+  }
+}
+
+// ---------- Selection ----------
+const sheet = document.getElementById('sheet');
+function renderSheet(p) {
+  document.getElementById('s-ref').textContent = `${p.ref} · ${p.en}`;
+  document.getElementById('s-name').textContent = P(p, 'name');
+  document.getElementById('s-desc').textContent = P(p, 'desc');
+  document.getElementById('s-spec').innerHTML = (P(p, 'spec') || []).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+function select(p) {
+  S.selected = p;
+  if (!p) { sheet.hidden = true; applyLook(); return; }
+  renderSheet(p);
+  sheet.hidden = false;
+  // internal parts sit inside the shell: see-through on so the selection is visible
+  if (!p.ghost && !S.ghost) document.getElementById('t-ghost').click();
+  applyLook();
+}
+document.getElementById('sheet-close').addEventListener('click', () => select(null));
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!down || S.mode !== 'explore') return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
+  down = null;
+  if (moved > 8 || dt > 500) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects([...meshParts.keys()], false).filter((h) => h.object.material.opacity > 0.5);
+  select(hits.length ? meshParts.get(hits[0].object) : null);
+});
+
+// ---------- Tools ----------
+const toggle = (id, fn) => { const b = document.getElementById(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); fn(on); }); };
+toggle('t-ghost', (on) => { S.ghost = on; applyLook(); });
+toggle('t-spin', (on) => { controls.autoRotate = on; });
+let fly = null;
+function flyTo(pos, target) { fly = { pos: pos.clone(), target: target.clone() }; }
+const viewTargetY = (t) => 20 + t * MAX_OFFSET * 0.5;
+const zoomFactor = (t) => 1 + t * MAX_OFFSET / 110;
+document.getElementById('t-reset').addEventListener('click', () => {
+  const t = S.explodeShown, target = new THREE.Vector3(0, viewTargetY(t), 0);
+  flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target);
+});
+
+// ---------- Modes & tour ----------
+const tourEl = document.getElementById('tour'), stepsEl = document.getElementById('steps');
+TOUR.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.addEventListener('click', () => goStep(i));
+  stepsEl.appendChild(b);
+});
+function renderTourText() {
+  [...stepsEl.children].forEach((b, i) => { b.innerHTML = `<span>${i + 1}</span>${T(i, 'tab')}`; });
+  document.getElementById('tour-title').textContent = T(S.step, 'title');
+  document.getElementById('tour-flow').textContent = T(S.step, 'flow');
+  document.getElementById('tour-text').textContent = T(S.step, 'text');
+}
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('mode-explore').setAttribute('aria-pressed', m === 'explore');
+  document.getElementById('mode-tour').setAttribute('aria-pressed', m === 'tour');
+  document.body.classList.toggle('touring', m === 'tour');
+  tourEl.hidden = m !== 'tour';
+  if (m === 'tour') { select(null); goStep(S.step); } else { flow.visible = false; applyLook(); }
+}
+function goStep(i) {
+  S.step = (i + TOUR.length) % TOUR.length;
+  const s = TOUR[S.step];
+  [...stepsEl.children].forEach((b, k) => k === S.step ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  renderTourText();
+  setExplode(s.explode);
+  applyLook();
+}
+
+// Language switch: re-renders every text in place (keeps view, step and explode as they are)
+function setLang(l) {
+  LANG = l;
+  try { localStorage.setItem('bd-lang', l); } catch (e) { /* storage blocked: choice lasts this visit */ }
+  document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
+  document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
+  document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    if (el.id === 'loading' && el.hidden) return;
+    el.textContent = ui(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', ui(el.dataset.i18nAria)));
+  renderTourText();
+  renderCalloutText();
+  if (S.selected) renderSheet(S.selected);
+  if (callouts.length) layoutCallouts();
+}
+document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
+document.getElementById('lang-zh').addEventListener('click', () => setLang('zh'));
+setLang(LANG);
+document.getElementById('mode-explore').addEventListener('click', () => setMode('explore'));
+document.getElementById('mode-tour').addEventListener('click', () => setMode('tour'));
+document.getElementById('tour-prev').addEventListener('click', () => goStep(S.step - 1));
+document.getElementById('tour-next').addEventListener('click', () => goStep(S.step + 1));
+
+// Signal flow: a line through part centres plus pulses travelling along it
+const flow = new THREE.Group(); flow.visible = false; scene.add(flow);
+const FLOW_N = 96;
+const flowLine = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(FLOW_N * 3), 3)),
+  new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false }));
+flowLine.renderOrder = 10; flow.add(flowLine);
+const pulses = Array.from({ length: 5 }, () => {
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true }));
+  s.renderOrder = 11; flow.add(s); return s;
+});
+function updateFlow(time) {
+  const s = TOUR[S.step];
+  if (S.mode !== 'tour' || !s.path || s.path.length < 2) { flow.visible = false; return; }
+  flow.visible = true;
+  const pts = s.path.map((id) => partPoint(byId[id], 'mid'));
+  const curvePts = [];
+  for (let i = 0; i < pts.length; i++) {
+    curvePts.push(pts[i]);
+    if (i < pts.length - 1) { const m = pts[i].clone().lerp(pts[i + 1], 0.5); m.y += 10; curvePts.push(m); }
+  }
+  const curve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal');
+  const arr = flowLine.geometry.attributes.position.array;
+  for (let i = 0; i < FLOW_N; i++) curve.getPoint(i / (FLOW_N - 1)).toArray(arr, i * 3);
+  flowLine.geometry.attributes.position.needsUpdate = true;
+  flowLine.geometry.computeBoundingSphere();
+  flowLine.material.color.copy(ACCENT);
+  pulses.forEach((p, k) => {
+    const u = ((time * 0.00025) + k / pulses.length) % 1;
+    curve.getPoint(u, p.position);
+    p.material.color.copy(ACCENT);
+    p.material.opacity = Math.sin(u * Math.PI);
+  });
+}
+
+// ---------- Loop ----------
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+  svg.setAttribute('width', innerWidth); svg.setAttribute('height', innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+renderer.setAnimationLoop((time) => {
+  const k = reduce ? 1 : 0.14;
+  const prevT = S.explodeShown;
+  S.explodeShown += (S.explode - S.explodeShown) * k;
+  if (Math.abs(S.explode - S.explodeShown) < 1e-4) S.explodeShown = S.explode;
+  readout.innerHTML = `+${Math.round(S.explodeShown * MAX_OFFSET)}<br>mm`;
+  updateExplode();
+  // keep the growing stack centred and in frame, preserving the user's own zoom
+  const dy = (viewTargetY(S.explodeShown) - controls.target.y) * 0.1;
+  controls.target.y += dy; camera.position.y += dy;
+  if (!fly && prevT !== S.explodeShown) {
+    const ratio = zoomFactor(S.explodeShown) / zoomFactor(prevT);
+    camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);
+  }
+  if (fly) {
+    camera.position.lerp(fly.pos, 0.12); controls.target.lerp(fly.target, 0.12);
+    if (camera.position.distanceTo(fly.pos) < 0.5) fly = null;
+  }
+  controls.update();
+  updateFlow(time);
+  renderer.render(scene, camera);
+  if (callouts.length) layoutCallouts();
+});
+</script>
+

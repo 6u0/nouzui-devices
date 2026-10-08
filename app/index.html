@@ -1,0 +1,1267 @@
+<title>Brain Device Inside</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- scope "/" in the manifest keeps both pages inside the installed app (PWA), whichever way the
+     folder is served; without it the scope is just this page's folder and the other page opens
+     outside the app -->
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* Layout: Apple Liquid Glass (iOS/iPadOS 26-27). The 3D model is the content layer on a soft
+   studio backdrop; every control floats above it as glass: a left-aligned Large Title, a capsule
+   segmented control top-right, a vertical capsule slider, one grouped toolbar, a glass card.
+   Shapes are concentric (outer radius = inner radius + padding); controls are capsules.
+   Type is the system font: SF Pro + Hiragino Sans (ja) / PingFang TC (zh) on Apple devices. */
+:root {
+  --bg-top: #f5f5f7;
+  --bg-bottom: #e8e8ed;
+  --label: #000000;                       /* iOS label */
+  --label-2: rgba(60, 60, 67, 0.6);       /* secondaryLabel */
+  --label-3: rgba(60, 60, 67, 0.3);       /* tertiaryLabel */
+  --separator: rgba(60, 60, 67, 0.18);
+  --fill: rgba(120, 120, 128, 0.16);      /* systemFill-ish track */
+  --accent: #0088ff;                      /* systemBlue (iOS 26 tuning) */
+  --accent-ink: #ffffff;
+  --glass: rgba(255, 255, 255, 0.62);     /* iOS 27 default: a little less clear than 26 */
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
+             "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --r-panel: 26px;  /* outer; inner rows use 26 - 8 = 18 */
+  color-scheme: light;
+}
+html[lang="zh-Hant"] {
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang TC", "Heiti TC",
+             "Microsoft JhengHei UI", system-ui, sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--label); font-family: var(--font-ui);
+  font-size: 17px; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+  background:
+    radial-gradient(60% 50% at 70% 20%, rgba(0, 136, 255, 0.07), transparent 70%),
+    radial-gradient(50% 45% at 15% 85%, rgba(255, 149, 0, 0.05), transparent 70%),
+    radial-gradient(90% 80% at 45% 45%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+button { font-family: inherit; color: inherit; letter-spacing: inherit; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+
+/* ---- Liquid Glass material ---- */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(190%); backdrop-filter: blur(22px) saturate(190%);
+  border: 0.5px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -0.5px 0 rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+/* only the larger surfaces catch the light (iOS 27): a soft specular rim along the top edge */
+.glass.lit::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 38%);
+  mix-blend-mode: soft-light;
+}
+/* when the WebGL lens is drawing the glass, the DOM panes only carry text and controls */
+body.gl-glass .glass { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: transparent; box-shadow: none; }
+body.gl-glass .glass.lit::before { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+  .glass { background: #f9f9fb; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+#leaders { position: fixed; inset: 0; pointer-events: none; overflow: visible; }
+#leaders path { fill: none; stroke: rgba(60, 60, 67, 0.55); stroke-width: 1; }
+#leaders circle { fill: #ffffff; stroke: var(--accent); stroke-width: 2.5; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+.callout {
+  position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: baseline;
+  padding: 7px 14px 8px; border-radius: 16px; white-space: nowrap;
+}
+.callout .ref { font: 600 12px/1 var(--font-mono); color: var(--label-2); }
+.callout b { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.callout small { grid-column: 2; font-size: 12px; color: var(--label-2); margin-top: 1px; }
+.callout.is-on { box-shadow: var(--glass-shadow), 0 0 0 2px var(--accent); }
+
+/* Large Title, left-aligned, straight on the content like a navigation title */
+.titleblock {
+  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); left: 24px;
+  display: grid; gap: 2px; pointer-events: none;
+}
+.titleblock .eyebrow { font-size: 13px; font-weight: 600; color: var(--label-2); letter-spacing: 0; text-transform: uppercase; }
+.titleblock h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
+.titleblock .eyebrow-row { display: flex; align-items: center; gap: 10px; }
+.titleblock .sibling { pointer-events: auto; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.titleblock .sibling:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+.titleblock .dims { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+/* capsule segmented control */
+.modes {
+  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); right: 18px;
+  display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+}
+.modes button {
+  border: 0; background: transparent; font-size: 15px; font-weight: 600;
+  min-height: 38px; padding: 0 20px; border-radius: 999px; cursor: pointer;
+  transition: background-color .25s, box-shadow .25s, color .25s;
+}
+.modes button[aria-pressed="true"] { background: #ffffff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08); }
+.modes.langs { top: calc(70px + env(safe-area-inset-top, 0px)); }
+.modes.langs button { min-height: 30px; padding: 0 13px; font-size: 13px; }
+
+/* vertical capsule slider; the thumb turns to clear glass while dragging */
+.rail {
+  position: fixed; right: 18px; top: 50%; transform: translateY(-44%);
+  width: 64px; height: min(52vh, 420px); display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
+  justify-items: center; padding: 14px 0; border-radius: 32px;
+}
+.rail .cap { font-size: 13px; font-weight: 600; color: var(--label-2); text-align: center; line-height: 1.25; }
+.rail .readout { font-size: 13px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.rail .readout br + * { color: var(--label-2); }
+.track { position: relative; width: 44px; height: calc(100% - 44px); margin: 22px 0; touch-action: none; cursor: ns-resize; }
+.track::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; transform: translateX(-50%); border-radius: 3px; background: var(--fill); }
+.track .fill { position: absolute; left: 50%; bottom: 0; width: 6px; transform: translateX(-50%); border-radius: 3px; background: var(--accent); }
+.track .tick { display: none; }
+.track .thumb {
+  position: absolute; left: 50%; width: 30px; height: 40px; transform: translate(-50%, 50%);
+  border-radius: 999px; background: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16), 0 0.5px 2px rgba(0, 0, 0, 0.12);
+  transition: transform .2s, background-color .2s, width .2s, height .2s;
+}
+.track .thumb svg { display: none; }
+.track.dragging .thumb {
+  width: 38px; height: 52px; background: rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: blur(2px) saturate(160%); backdrop-filter: blur(2px) saturate(160%);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.9), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+}
+.track:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 4px; border-radius: 22px; }
+
+/* one grouped toolbar, text buttons only */
+.tools {
+  position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; max-width: calc(100vw - 120px);
+}
+.chip {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px;
+  font-size: 15px; font-weight: 600; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
+  transition: background-color .2s, color .2s;
+}
+.chip .dot { display: none; }
+.chip[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.chip:active, .modes button:active, .steps button:active, .tour .nav button:active { transform: scale(0.97); }
+.chip:focus-visible, .modes button:focus-visible, .steps button:focus-visible, .tour .nav button:focus-visible, .sheet .close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px;
+}
+
+/* glass card */
+.sheet {
+  position: fixed; right: 100px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: min(370px, calc(100vw - 136px)); padding: 18px 18px 10px; border-radius: var(--r-panel);
+  display: grid; gap: 6px;
+}
+.sheet .ref { font: 600 12px/1.2 var(--font-mono); color: var(--label-2); }
+.sheet h2 { margin: 0; padding-right: 36px; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.sheet p { margin: 2px 0 6px; font-size: 15px; line-height: 1.55; color: rgba(0, 0, 0, 0.85); }
+.sheet dl { margin: 0 -8px; padding: 2px 12px; display: grid; grid-template-columns: auto 1fr; border-radius: 18px; background: rgba(255, 255, 255, 0.55); font-size: 13px; }
+.sheet dt, .sheet dd { padding: 9px 0; border-bottom: 0.5px solid var(--separator); }
+.sheet dt:last-of-type, .sheet dd:last-of-type { border-bottom: 0; }
+.sheet dt { padding-right: 14px; color: var(--label-2); font-weight: 500; }
+.sheet dd { margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+.sheet .close {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: var(--fill); color: var(--label-2); display: grid; place-items: center; cursor: pointer; font-size: 0;
+}
+.sheet .close::before, .sheet .close::after { content: ""; position: absolute; width: 12px; height: 2px; border-radius: 1px; background: currentColor; }
+.sheet .close::before { transform: rotate(45deg); }
+.sheet .close::after { transform: rotate(-45deg); }
+
+/* how-it-works panel: a sidebar-style list + text */
+.tour {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: min(640px, calc(100vw - 36px)); padding: 8px 8px 12px; border-radius: var(--r-panel); display: grid; gap: 8px;
+}
+.steps { display: flex; gap: 2px; overflow-x: auto; }
+.steps button {
+  flex: 1 0 auto; min-height: 40px; padding: 0 12px; border: 0; border-radius: 18px; background: transparent;
+  font-size: 15px; font-weight: 500; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px;
+}
+.steps button span {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--fill); color: var(--label-2); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.steps button[aria-current="step"] { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); font-weight: 600; }
+.steps button[aria-current="step"] span { background: var(--accent); color: var(--accent-ink); }
+.tour h2, .tour .flowkey, .tour p { margin: 0 10px; }
+.tour h2 { margin-top: 6px; font-size: 20px; line-height: 25px; font-weight: 700; letter-spacing: -0.01em; }
+.tour .flowkey { font: 500 12px/1.45 var(--font-mono); color: var(--accent); }
+.tour p { font-size: 15px; line-height: 1.6; color: rgba(0, 0, 0, 0.85); max-width: 62ch; }
+.tour .nav { display: flex; justify-content: space-between; gap: 8px; margin: 6px 4px 0; }
+.tour .nav button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--fill); }
+.tour .nav #tour-next { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+.loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--label-2); pointer-events: none; }
+
+body.touring .tools, body.touring .sheet { display: none; }
+@media (min-width: 900px) {
+  .tour { left: 18px; transform: none; top: calc(112px + env(safe-area-inset-top, 0px)); bottom: auto; width: 320px; }
+  .steps { flex-direction: column; }
+  .steps button { flex: none; }
+}
+@media (max-width: 899px) {
+  /* card sits above the toolbar instead of beside it */
+  .sheet { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 700px) {
+  .titleblock { left: 18px; }
+  .titleblock h1 { font-size: 28px; line-height: 34px; }
+  .rail { height: 40vh; width: 56px; right: 12px; }
+  .sheet { right: 16px; left: 16px; width: auto; bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  .modes { top: auto; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); right: 16px; }
+  .modes.langs { top: calc(18px + env(safe-area-inset-top, 0px)); bottom: auto; }
+  .tools { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); left: 16px; }
+  .tour { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="stage" data-i18n-aria="stage" aria-label="脳デバイスの3Dモデル。ドラッグで回転、ピンチで拡大"></div>
+<svg id="leaders" aria-hidden="true"></svg>
+<div id="labels"></div>
+<div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
+
+<header class="titleblock">
+  <div class="eyebrow-row"><span class="eyebrow">Brain Device · Rev 2</span><a class="sibling" href="headgear/" data-local="headgear/ ../headgear/app/" data-artifact="https://claude.ai/artifact/TxEiy18EEpprtQPuTbdSzW" data-i18n="sibling">ヘッドギアへ →</a></div>
+  <h1 data-i18n="title">脳デバイスの中身</h1>
+  <span class="dims">96.1 × 127.4 × 82.5 mm · 142 solids</span>
+</header>
+
+<nav class="modes glass" data-i18n-aria="modes" aria-label="表示モード">
+  <button id="mode-explore" aria-pressed="true" data-i18n="explore">観察</button>
+  <button id="mode-tour" aria-pressed="false" data-i18n="tour">しくみ</button>
+</nav>
+
+<nav class="modes langs glass" aria-label="言語 / 語言">
+  <button id="lang-ja" aria-pressed="true" lang="ja">日本語</button>
+  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
+</nav>
+
+<div class="rail glass lit">
+  <div class="cap"><span data-i18n="explode">分解</span></div>
+  <div class="track" id="track" role="slider" tabindex="0" data-i18n-aria="track" aria-label="高さ方向の分解量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="fill" id="fill"></div>
+    <div class="thumb" id="thumb"></div>
+  </div>
+  <div class="readout" id="readout">+0<br>mm</div>
+</div>
+
+<div class="tools glass" id="tools">
+  <button class="chip" id="t-ghost" aria-pressed="false"><span class="dot"></span><span data-i18n="ghost">外装を透かす</span></button>
+  <button class="chip" id="t-spin" aria-pressed="true"><span class="dot"></span><span data-i18n="spin">自動回転</span></button>
+  <button class="chip" id="t-reset" data-i18n="reset">視点を戻す</button>
+</div>
+
+<aside class="sheet glass lit" id="sheet" hidden>
+  <button class="close" id="sheet-close" data-i18n-aria="close" aria-label="閉じる">×</button>
+  <span class="ref" id="s-ref"></span>
+  <h2 id="s-name"></h2>
+  <p id="s-desc"></p>
+  <dl id="s-spec"></dl>
+</aside>
+
+<section class="tour glass lit" id="tour" hidden>
+  <div class="steps" id="steps"></div>
+  <h2 id="tour-title"></h2>
+  <span class="flowkey" id="tour-flow"></span>
+  <p id="tour-text"></p>
+  <div class="nav"><button id="tour-prev" data-i18n="prev">← 前へ</button><button id="tour-next" data-i18n="next">次へ →</button></div>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ---------- Part catalogue ----------
+// sel: matched against each mesh's CAD assembly path (extras.path from to-glb.js, e.g.
+// "M5StickC Plus/M5StickC v14/pinsocket_8 v2"). A mesh goes to the first part whose sel matches,
+// with m5 tried last so the screws and socket inside the M5 assembly land in their own parts.
+// Meshes no part claims are listed in the console after loading.
+// finish: surface override ('gel' or material params); paint: paintGel() mode for the gel bodies
+// anchor: 'one' puts the leader dot on one source mesh (the right-most) instead of the part's centre
+// showFrom: hidden until the explode readout reaches this many mm
+// layer: how many "floors" an internal part rises inside the device group when the height slider is at 100%
+const PARTS = [
+  { id: 'brain', ref: 'G1', name: '脳型ジェル外装', en: 'brain', sel: /^brain$/, finish: 'gel', paint: 'folds', stack: 'brain', ghost: true,
+    desc: 'デバイス全体をすっぽり包む、脳の形をした外装。超軟質ウレタンゲル製で、指で押すとやわらかく沈みます。中の機械部品は、このジェルの内側に収まっています。', spec: [['材質', '超軟質ウレタンゲル'], ['外形', '約 96 × 127 × 83 mm']] },
+  { id: 'braincover', ref: 'G2', name: '底面ジェルカバー', en: 'brain_cover', sel: /^brain_cover$/, finish: 'gel', paint: 'flat', stack: 'cover', ghost: true,
+    desc: '脳型外装の底のくぼみにはまる楕円形のフタ。脳型外装と同じ超軟質ウレタンゲル製で、デバイス本体はこの上のジェルの層をはさんだ空洞に収まっています。', spec: [['材質', '超軟質ウレタンゲル'], ['外形', '約 49 × 81 × 10 mm']] },
+  { id: 'shell', ref: 'H1', name: 'シェル（本体外装）', en: 'shell', sel: /^shell$/, stack: 'shell', ghost: true,
+    desc: '全体を受け止める土台の外装。内部の部品はすべてこの上に積み重なっています。', spec: [['材質', '3Dプリント樹脂（CAD上の外観設定）']] },
+  { id: 'm5', ref: 'U1', name: 'M5StickS3', en: 'M5StickS3', sub: '制御・頭脳（ESP32-S3）', sel: /^M5StickC Plus\//, layer: 0, callout: true,
+    desc: 'デバイスの頭脳。Wi‑Fiで外部のPCとつながり、OSCメッセージでやりとりします。PCから指示されるフェーズ（0〜4）によって、センサーを読むか・振動させるかが切り替わります。',
+    spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9002）'], ['入力', 'ホール GPIO10 / 圧力 GPIO1–4 / ボタン GPIO11'], ['出力', '振動PWM GPIO8・GPIO7 / LED 赤 GPIO0・緑 GPIO43'], ['監視', 'LiPo電圧 GPIO5 / 充電中 GPIO6'], ['内蔵IMU', '衝撃検知（フェーズ4）'], ['ボタン', '1回: 画面切替 / 2回: 充電専用モード / 10秒長押し: 電源OFF']] },
+  { id: 'screws', ref: 'S1', name: 'M2キャップスクリュー ×2', en: 'M2 cap screw 8mm', sel: /M2 cap screw/, layer: 0.4,
+    desc: '内部部品を固定するM2のネジ（長さ8mm）。', spec: [['規格', 'M2 × 8mm']] },
+  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'lipo battery', sel: /lipo battery$/, finish: { metalness: 0.55, roughness: 0.32 }, layer: 1, sub: '電源（GPIO5で電圧監視）',
+    desc: 'M5StickS3本体とは別の充電式リチウムポリマー電池。電圧はM5StickS3が常に監視していて、1秒ごとにPCへ送られます。', spec: [['電圧監視', 'GPIO5（1/2に分圧して読み、×2で復元・10回平均）'], ['低残量', '3.55 V 未満で赤LED点滅'], ['PCへ送信', '/battery/lipo（1秒ごと）'], ['外形', '約 8 × 34 × 20 mm']] },
+  { id: 'hallcase', ref: 'H2', name: 'ホールセンサーケース', en: 'hall_sensor_case', sel: /^hall_sensor_case$/, layer: 1.3, ghost: false,
+    desc: 'ホールセンサーまわりを保持する縦向きの樹脂パーツ。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'socket', ref: 'J1', name: '8ピンソケット', en: 'pinsocket_8', sub: 'M5StickS3との接続', sel: /pinsocket_8/, layer: 1.6,
+    desc: 'M5StickS3のピンヘッダを受けるソケット。ここから内部の基板やセンサーへ信号がつながります。', spec: [['ピン数', '8']] },
+  { id: 'vibrator', ref: 'M1', name: '振動モーター', en: 'vibrator', sel: /(^|\/)vibrator$/, finish: { metalness: 0.9, roughness: 0.25 }, layer: 2, sub: '出力（心拍パターン）',
+    desc: 'DRV8833から電流を受けて回る振動モーター。PCから /heartrate を受け取るたびに、心拍のような約0.33秒の振動を1回出します。', spec: [['波形', '0→220→220→130→40→80→0（PWM値 / 255）'], ['長さ', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
+  { id: 'chargerbase', ref: 'H3', name: '充電モジュール台座', en: 'charger_substrare', sel: /charger_substrare$/, layer: 2,
+    desc: '充電モジュールを載せるための台座パーツ。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'drvcase', ref: 'H4', name: 'ドライバーケース', en: 'diver_case', sel: /^diver_case$/, layer: 2.7,
+    desc: 'モータードライバー基板とホールセンサーを載せるケース。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'drv', ref: 'U2', name: 'DRV8833', en: 'DRV8833', sub: 'モータードライバー', sel: /^DRV8833/, layer: 3.4, callout: true,
+    desc: 'マイコンの弱い信号を、モーターを回せる大きな電流に変える「増幅役」。M5StickS3のピンから直接モーターを回すことはできないため、この基板を間に挟みます。',
+    spec: [['IC', 'TI DRV8833（デュアルHブリッジ）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← LOW固定（回転は一方向）'], ['出力', '振動モーターへ']] },
+  { id: 'tp', ref: 'U3', name: 'TP4057', en: 'TP4057 Mini', sub: '充電モジュール（USB-C）', sel: /^Charging Module TP4057/, layer: 3.4, callout: true,
+    desc: 'USB-Cから給電してLiPoバッテリーを充電する小型モジュール。充電中を示すCHRG信号をM5StickS3が読み取り、LiPoが「充電中」か「満充電」かを判定します。',
+    spec: [['IC', 'TP4057 リニア充電IC'], ['入力', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中、10サンプルでノイズ除去）'], ['判定', 'M5に給電中（VBUS ≥ 4.0 V）のときだけ']] },
+  { id: 'hall', ref: 'U4', name: 'ホールセンサー', en: 'KY-003 Hall Sensor', sel: /^KY-003 Hall Sensor/, layer: 4, sub: '入力（GPIO10）',
+    desc: '磁石を検出するセンサー。フェーズ3のとき、出力がLOWからHIGHに切り替わった瞬間にM5StickS3がPCへ /magnet を送ります。', spec: [['モジュール', 'KY-003'], ['接続', 'GPIO10（デジタル入力・プルアップ）'], ['電源', 'M5StickS3 の EXT 5V 出力'], ['PCへ送信', '/magnet 1（フェーズ3）']] },
+  { id: 'pressure', ref: 'U5', name: '圧力センサー ×4', en: 'RP-C10-ST', sub: '入力（GPIO1–4）', sel: /^RP-C10-ST[^/]*\/(?!pin_)/, stack: 'sensors', anchor: 'one', callout: true,
+    desc: 'シェルの左右の内側に2枚ずつ貼られた、薄いフィルム型の圧力センサー。押されると抵抗が下がり、その変化をM5StickS3がGPIO1–4のアナログ入力で読み取ります。フェーズ3と4のあいだ20msごとに読み、0〜100の値として /power でPCへ送ります。',
+    spec: [['型番', 'RP-C10-ST（薄膜圧力センサー）'], ['数', '4枚（左右に2枚ずつ）'], ['接続', 'GPIO1 / 2 / 3 / 4（アナログ入力）'], ['構造', 'PETフィルム＋カーボン層＋銀電極、圧着端子'], ['PCへ送信', '/power（6chに補間、20msごと）']] },
+  { id: 'pressurepins', ref: 'U5', name: '圧力センサーの端子ピン', en: 'RP-C10-ST pin', sel: /^RP-C10-ST[^/]*\/pin_/, stack: 'sensors', showFrom: 100,
+    desc: '圧力センサーの端子から出ている2本のピン。組み立てた状態では見えないため、分解量が +100 mm を超えてから表示します。', spec: [['本数', '2本 × 4枚']] },
+  { id: 'arm2', ref: 'H5', name: 'アーム2（上部カバー前）', en: 'arm2', sel: /^arm2$/, stack: 'arms', ghost: true,
+    desc: '頭頂部を覆うカーブしたカバーの前側。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'arm1', ref: 'H6', name: 'アーム1（上部カバー後）', en: 'arm1', sel: /^arm1$/, stack: 'arms', ghost: true,
+    desc: '頭頂部を覆うカーブしたカバーの後ろ側。', spec: [['材質', '3Dプリント樹脂']] },
+];
+const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
+// Explode in two stages on one slider:
+//  1) 0 → GROUP_SPLIT: three blocks come apart — gel base cover (lifts a little), the device group
+//     (clears the cover) and the gel brain (clears the device).
+//  2) GROUP_SPLIT → 1: the device group comes apart: internal parts rise LAYER_GAP mm per layer above
+//     the M5, 'shell' lifts clear of the internals, the pressure 'sensors' clear of the shell and
+//     'arms' clear of the sensors; the brain keeps
+//     rising so it stays clear of the growing stack. (Rises come from the bounding boxes once loaded.)
+const GROUP_SPLIT = 0.35;  // share of the slider used by stage 1
+const LAYER_GAP = 12;      // mm per layer at 100%
+const CLEARANCE = 8;       // mm between stacked groups at 100%
+const COVER_LIFT = 10;     // mm the base cover rises in stage 1
+
+// Surface finish by original STEP colour
+const FINISH = {
+  f3cb7c: { metalness: 1, roughness: 0.26 },      // gold-plated pins / pads
+  f4e5a7: { metalness: 1, roughness: 0.3 },
+  d1ccc0: { metalness: 0.9, roughness: 0.3 },     // tin / steel
+  cbcbcb: { metalness: 0.95, roughness: 0.28 },   // screws
+  ffffff: { metalness: 0.85, roughness: 0.3 },
+  f6f6f3: { metalness: 0.8, roughness: 0.32 },
+  cbcbad: { metalness: 0, roughness: 0.55 },      // grove socket plastic
+  b39657: { metalness: 0, roughness: 0.5 },       // ceramic
+  191919: { metalness: 0, roughness: 0.32, clearcoat: 0.4 },
+  434343: { metalness: 0, roughness: 0.45 },
+  cad1ee: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // PCB w/ solder mask
+  f7e9d1: { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 },
+  db620b: { metalness: 0, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 }, // M5 body
+  a0a0a0: { metalness: 0, roughness: 0.72 },  // printed parts
+  '3f3f3f': { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 }, // printed carbon shell
+  e5e8e5: { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 },   // PET film
+  '212124': { metalness: 0, roughness: 0.75 },                   // carbon ink
+  d1d1cc: { metalness: 0.9, roughness: 0.35 },                   // silver electrode
+  bfc2c7: { metalness: 0.95, roughness: 0.28 },                  // crimp terminal
+  b8bac2: { metalness: 0.95, roughness: 0.28 },                  // terminal pin
+  f7f7f5: { metalness: 0, roughness: 0.6 },                      // white stiffener
+  c4c5c4: { metalness: 0.9, roughness: 0.3 },                    // KY-003 pins
+  '404040': { metalness: 0.15, roughness: 0.42, clearcoat: 0.5 }, // KY-003 PCB
+};
+// soft urethane gel, painted and glossed like the real piece: satin paint under a wet clear coat
+const GEL = { metalness: 0, roughness: 0.58, clearcoat: 1, clearcoatRoughness: 0.1, sheen: 0.2, sheenRoughness: 0.5, sheenColor: 0xff7a7a };
+
+// ---------- Painted gel brain ----------
+// The real brain is gel painted deep red: near-black in the folds, pink-white on the ridges,
+// with blotchy mottling. The CAD mesh is one grey body, so the paint is rebuilt in vertex colours:
+// fold depth = how far each vertex sits above / below a heavily smoothed copy of the surface.
+const PAINT = { fold: 0x170303, base: 0x5c0f15, ridge: 0x962b31, light: 0xd88a86 };
+function hash3(x, y, z) { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); }
+function noise3(x, y, z) {  // value noise, trilinear
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const u = x - xi, v = y - yi, w = z - zi, f = (t) => t * t * (3 - 2 * t);
+  let r = 0;
+  for (let k = 0; k < 8; k++) {
+    const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+    r += hash3(xi + dx, yi + dy, zi + dz) * (dx ? f(u) : 1 - f(u)) * (dy ? f(v) : 1 - f(v)) * (dz ? f(w) : 1 - f(w));
+  }
+  return r;
+}
+const fbm = (x, y, z) => 0.55 * noise3(x, y, z) + 0.3 * noise3(x * 2.1, y * 2.1, z * 2.1) + 0.15 * noise3(x * 4.3, y * 4.3, z * 4.3);
+function paintGel(g, mode) {
+  const pos = g.attributes.position, nrm = g.attributes.normal, n = pos.count;
+  const depth = new Float32Array(n);
+  if (mode === 'folds' && g.index) {
+    // vertex neighbours (CSR) from the triangles
+    const a = g.index.array, deg = new Uint32Array(n + 1);
+    for (let t = 0; t < a.length; t++) deg[a[t] + 1] += 2;
+    for (let v = 0; v < n; v++) deg[v + 1] += deg[v];
+    const nb = new Uint32Array(deg[n]), at = deg.slice(0, n);
+    for (let t = 0; t < a.length; t += 3) for (let k = 0; k < 3; k++) {
+      const v = a[t + k]; nb[at[v]++] = a[t + (k + 1) % 3]; nb[at[v]++] = a[t + (k + 2) % 3];
+    }
+    // smooth the surface until single folds are ironed out
+    let cur = Float32Array.from(pos.array), nxt = new Float32Array(cur.length);
+    for (let it = 0; it < 40; it++) {
+      for (let v = 0; v < n; v++) {
+        let sx = 0, sy = 0, sz = 0; const c = deg[v + 1] - deg[v] || 1;
+        for (let j = deg[v]; j < deg[v + 1]; j++) { const w = nb[j] * 3; sx += cur[w]; sy += cur[w + 1]; sz += cur[w + 2]; }
+        nxt[v * 3] = (cur[v * 3] + sx / c) / 2; nxt[v * 3 + 1] = (cur[v * 3 + 1] + sy / c) / 2; nxt[v * 3 + 2] = (cur[v * 3 + 2] + sz / c) / 2;
+      }
+      [cur, nxt] = [nxt, cur];
+    }
+    for (let v = 0; v < n; v++) {
+      depth[v] = (pos.getX(v) - cur[v * 3]) * nrm.getX(v) + (pos.getY(v) - cur[v * 3 + 1]) * nrm.getY(v) + (pos.getZ(v) - cur[v * 3 + 2]) * nrm.getZ(v);
+    }
+    // normalise to -1 (deepest fold) .. +1 (ridge top) using robust percentiles
+    const sorted = Float32Array.from(depth).sort(), lo = sorted[Math.floor(n * 0.04)], hi = sorted[Math.floor(n * 0.96)];
+    for (let v = 0; v < n; v++) depth[v] = Math.max(-1, Math.min(1, ((depth[v] - lo) / (hi - lo)) * 2 - 1));
+  }
+  const C = Object.fromEntries(Object.entries(PAINT).map(([k, h]) => [k, new THREE.Color(h)]));
+  const col = new THREE.Color(), out = new Float32Array(n * 3);
+  for (let v = 0; v < n; v++) {
+    const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v), d = depth[v];
+    // folds -> ridges
+    if (d < 0) col.copy(C.base).lerp(C.fold, Math.pow(-d, 0.6));
+    else col.copy(C.base).lerp(C.ridge, Math.pow(d, 1.3));
+    // blotchy paint: dark wine patches and pale pink dry-brushed spots, mostly on the ridges
+    col.lerp(C.fold, Math.min(0.6, Math.max(0, 0.58 - fbm(x * 0.09, y * 0.09, z * 0.09)) * 1.4));
+    col.lerp(C.light, Math.min(0.75, Math.max(0, fbm(x * 0.22 + 9, y * 0.22, z * 0.22) - 0.5) * 2.6) * (0.3 + 0.7 * Math.max(0, d)));
+    out[v * 3] = col.r; out[v * 3 + 1] = col.g; out[v * 3 + 2] = col.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(out, 3));
+}
+
+// ---------- How-it-works tour ----------
+const TOUR = [
+  { tab: '全体', labels: ['m5', 'hall', 'vibrator', 'battery'], title: '全体の構成', flow: 'PC ⇄ Wi‑Fi / OSC ⇄ M5StickS3', parts: [], explode: 0.55, ghost: true,
+    text: 'M5StickS3がWi‑Fi経由でPCとOSCメッセージをやりとりします。PCが /phase でフェーズ（0〜4）を指示し、デバイスはフェーズに応じてセンサーの値を送ったり、振動したりします。' },
+  { tab: '通信', labels: ['m5'], title: 'PCとのやりとり（OSC）', flow: 'PC → /phase /heartrate /battery /init /reboot', path: [], parts: ['m5'], explode: 0.5,
+    text: '起動するとWi‑Fiにつながり、PCへ /ask を送ります。以降は1秒ごとに電池の状態（/battery/m5、/battery/lipo）を送信します。フェーズ3では圧力とホールセンサー、フェーズ4では圧力と衝撃をPCへ送ります。' },
+  { tab: '磁石', labels: ['hall', 'socket', 'm5'], title: '入力：ホールセンサー', flow: 'ホールセンサー → GPIO10 → M5StickS3 → /magnet', path: ['hall', 'socket', 'm5'], parts: ['hall', 'socket', 'm5'], explode: 0.65,
+    text: 'フェーズ3のとき、ホールセンサーの出力がLOWからHIGHに切り替わった瞬間に、M5StickS3がPCへ /magnet を送ります。' },
+  { tab: '圧力', labels: ['pressure', 'm5'], title: '入力：圧力センサー（4ch）', flow: '圧力センサー ×4 → GPIO1–4 → 6chに補間 → /power（20msごと）', path: ['pressure', 'socket', 'm5'], parts: ['pressure', 'pressurepins', 'socket', 'm5'], explode: 0.55,
+    text: 'シェルの左右の内側に、フィルム型の圧力センサーが2枚ずつ貼られています。フェーズ3と4のあいだ、4つのセンサーを20msごとに読み取ります。隣どうしを少し混ぜ合わせて6chに広げ、0〜100の値として /power で送ります。' },
+  { tab: '衝撃', labels: ['m5'], title: '入力：衝撃（内蔵IMU）', flow: 'IMU → 加速度の変化 > 5G → /gravity', path: [], parts: ['m5'], explode: 0.5,
+    text: 'フェーズ4では、M5StickS3内蔵のIMUで加速度の大きさを見ています。前回の値から5G以上変化すると、PCへ /gravity を1回だけ送ります（フェーズ開始から0.5秒間は無視）。' },
+  { tab: '振動', labels: ['m5', 'drv', 'vibrator'], title: '出力：心拍の振動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 振動モーター', path: ['m5', 'drv', 'vibrator'], parts: ['m5', 'drv', 'vibrator', 'socket'], explode: 0.65,
+    text: 'フェーズ2以上でPCから /heartrate 1 を受け取ると、約0.33秒の振動を1回出します。強さ（PWM値）は 0→220→220→130→40→80→0 と変化します。PWMはGPIO8から1kHzで出力され、DRV8833で増幅されて振動モーターを回します。' },
+  { tab: '電源', labels: ['tp', 'battery', 'm5'], title: '電源：充電と電池の監視', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電圧 → GPIO5', path: ['tp', 'battery', 'm5'], parts: ['tp', 'battery', 'chargerbase', 'm5'], explode: 0.65,
+    text: 'TP4057がUSB-CからLiPoを充電します。M5StickS3はLiPoの電圧（GPIO5）と充電中かどうか（GPIO6）を常に監視しています。LiPoが3.55V未満か、本体の残量が20%未満になると、赤LEDが点滅します。ボタンを2回押すと、Wi‑Fiや振動を止めた充電専用モードになります。' },
+];
+
+// ---------- Language: 日本語 (default, in PARTS/TOUR above) / 繁體中文（台灣） ----------
+const UI = {
+  ja: {
+    title: '脳デバイスの中身', loading: 'LOADING MODEL…', loadFail: 'モデルを読み込めませんでした。ページを再読み込みしてください。',
+    explore: '観察', tour: 'しくみ', explode: '分解', ghost: '外装を透かす', spin: '自動回転', reset: '視点を戻す',
+    prev: '← 前へ', next: '次へ →',
+    stage: '脳デバイスの3Dモデル。ドラッグで回転、ピンチで拡大', modes: '表示モード', track: '高さ方向の分解量', close: '閉じる', sibling: 'ヘッドギアへ →',
+  },
+  zh: {
+    title: '腦裝置的內部', loading: '模型載入中…', loadFail: '無法載入模型，請重新整理頁面。',
+    explore: '觀察', tour: '運作原理', explode: '分解', ghost: '外殼透視', spin: '自動旋轉', reset: '重設視角',
+    prev: '← 上一步', next: '下一步 →',
+    stage: '腦裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉', sibling: '前往頭戴裝置 →',
+  },
+};
+const ZH_PARTS = {
+  brain: { name: '腦形凝膠外殼', desc: '把整個裝置完整包覆、做成大腦形狀的外殼。以超軟質胺甲酸乙酯凝膠製成，用手指按壓會柔軟地陷下去。內部的機構零件都收在這層凝膠裡面。', spec: [['材質', '超軟質胺甲酸乙酯凝膠'], ['外形', '約 96 × 127 × 83 mm']] },
+  braincover: { name: '底面凝膠蓋', desc: '嵌入腦形外殼底部凹槽的橢圓形蓋子。與腦形外殼同樣以超軟質胺甲酸乙酯凝膠製成，裝置本體則收在它上方、隔著一層凝膠的空腔裡。', spec: [['材質', '超軟質胺甲酸乙酯凝膠'], ['外形', '約 49 × 81 × 10 mm']] },
+  shell: { name: '外殼（本體）', desc: '承載整體的底座外殼。內部零件全部疊放在它上面。', spec: [['材質', '3D 列印樹脂（CAD 外觀設定）']] },
+  m5: { sub: '控制・大腦（ESP32-S3）',
+    desc: '裝置的大腦。透過 Wi‑Fi 連線到外部電腦，以 OSC 訊息互相溝通。依照電腦指定的階段（0〜4），切換要讀取感測器還是產生震動。',
+    spec: [['通訊', 'Wi‑Fi + OSC（UDP 接收 9000／傳送 9002）'], ['輸入', '霍爾 GPIO10／壓力 GPIO1–4／按鈕 GPIO11'], ['輸出', '震動 PWM GPIO8・GPIO7／LED 紅 GPIO0・綠 GPIO43'], ['監測', 'LiPo 電壓 GPIO5／充電中 GPIO6'], ['內建 IMU', '撞擊偵測（階段 4）'], ['按鈕', '按 1 次：切換畫面／按 2 次：僅充電模式／長按 10 秒：關機']] },
+  screws: { name: 'M2 內六角螺絲 ×2', desc: '固定內部零件的 M2 螺絲（長 8mm）。', spec: [['規格', 'M2 × 8mm']] },
+  battery: { name: 'LiPo 電池', sub: '電源（以 GPIO5 監測電壓）',
+    desc: '與 M5StickS3 本體分開的鋰聚合物充電電池。M5StickS3 會持續監測它的電壓，並每秒傳送給電腦。',
+    spec: [['電壓監測', 'GPIO5（分壓成 1/2 讀取，×2 還原，取 10 次平均）'], ['低電量', '低於 3.55 V 時紅色 LED 閃爍'], ['傳送給電腦', '/battery/lipo（每秒）'], ['外形', '約 8 × 34 × 20 mm']] },
+  hallcase: { name: '霍爾感測器外殼', desc: '固定霍爾感測器周邊的直立樹脂零件。', spec: [['材質', '3D 列印樹脂']] },
+  socket: { name: '8 針插座', sub: '與 M5StickS3 連接', desc: '承接 M5StickS3 排針的插座。訊號從這裡連到內部的電路板和感測器。', spec: [['針數', '8']] },
+  vibrator: { name: '震動馬達', sub: '輸出（心跳模式）',
+    desc: '由 DRV8833 供電而轉動的震動馬達。每次從電腦收到 /heartrate，就輸出一次約 0.33 秒、像心跳一樣的震動。',
+    spec: [['波形', '0→220→220→130→40→80→0（PWM 值／255）'], ['長度', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
+  chargerbase: { name: '充電模組底座', desc: '放置充電模組的底座零件。', spec: [['材質', '3D 列印樹脂']] },
+  drvcase: { name: '驅動器外殼', desc: '放置馬達驅動板和霍爾感測器的外殼。', spec: [['材質', '3D 列印樹脂']] },
+  drv: { sub: '馬達驅動器',
+    desc: '把微控制器微弱的訊號，轉換成足以驅動馬達的大電流的「放大器」。M5StickS3 的腳位無法直接驅動馬達，所以中間要接這塊板子。',
+    spec: [['IC', 'TI DRV8833（雙 H 橋）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← 固定 LOW（單向旋轉）'], ['輸出', '接到震動馬達']] },
+  tp: { sub: '充電模組（USB-C）',
+    desc: '從 USB-C 供電、為 LiPo 電池充電的小型模組。M5StickS3 讀取表示充電中的 CHRG 訊號，判斷 LiPo 是「充電中」還是「已充飽」。',
+    spec: [['IC', 'TP4057 線性充電 IC'], ['輸入', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中，以 10 次取樣去除雜訊）'], ['判斷', '僅在 M5 供電中（VBUS ≥ 4.0 V）時']] },
+  hall: { name: '霍爾感測器', sub: '輸入（GPIO10）',
+    desc: '偵測磁鐵的感測器。在階段 3 時，輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。',
+    spec: [['模組', 'KY-003'], ['連接', 'GPIO10（數位輸入・上拉）'], ['電源', 'M5StickS3 的 EXT 5V 輸出'], ['傳送給電腦', '/magnet 1（階段 3）']] },
+  pressure: { name: '壓力感測器 ×4', sub: '輸入（GPIO1–4）',
+    desc: '左右兩側內面各貼 2 片的薄膜型壓力感測器。受壓時電阻會下降，M5StickS3 以 GPIO1–4 的類比輸入讀取這個變化。在階段 3 和 4 期間每 20ms 讀取一次，再以 0〜100 的數值透過 /power 傳送給電腦。',
+    spec: [['型號', 'RP-C10-ST（薄膜壓力感測器）'], ['數量', '4 片（左右各 2 片）'], ['連接', 'GPIO1 / 2 / 3 / 4（類比輸入）'], ['結構', 'PET 薄膜＋碳層＋銀電極、壓接端子'], ['傳送給電腦', '/power（補成 6ch，每 20ms）']] },
+  pressurepins: { name: '壓力感測器的端子針腳', desc: '從壓力感測器端子伸出的 2 支針腳。組裝狀態下看不到，所以分解量超過 +100 mm 後才顯示。', spec: [['數量', '2 支 × 4 片']] },
+  arm2: { name: '臂件 2（上蓋前側）', desc: '覆蓋頭頂的弧形外蓋前側。', spec: [['材質', '3D 列印樹脂']] },
+  arm1: { name: '臂件 1（上蓋後側）', desc: '覆蓋頭頂的弧形外蓋後側。', spec: [['材質', '3D 列印樹脂']] },
+};
+const ZH_TOUR = [
+  { tab: '全體', title: '整體構成', flow: '電腦 ⇄ Wi‑Fi / OSC ⇄ M5StickS3',
+    text: 'M5StickS3 透過 Wi‑Fi 與電腦交換 OSC 訊息。電腦用 /phase 指定階段（0〜4），裝置會依照階段傳送感測器數值，或產生震動。' },
+  { tab: '通訊', title: '與電腦的溝通（OSC）', flow: '電腦 → /phase /heartrate /battery /init /reboot',
+    text: '開機後連上 Wi‑Fi，並向電腦傳送 /ask。之後每秒傳送電池狀態（/battery/m5、/battery/lipo）。階段 3 會傳送壓力與霍爾感測器，階段 4 會傳送壓力與撞擊。' },
+  { tab: '磁鐵', title: '輸入：霍爾感測器', flow: '霍爾感測器 → GPIO10 → M5StickS3 → /magnet',
+    text: '在階段 3 時，霍爾感測器的輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。' },
+  { tab: '壓力', title: '輸入：壓力感測器（4ch）', flow: '壓力感測器 ×4 → GPIO1–4 → 補成 6ch → /power（每 20ms）',
+    text: '外殼左右兩側的內面，各貼有 2 片薄膜型壓力感測器。在階段 3 和 4 期間，每 20ms 讀取這 4 個感測器。把相鄰的數值稍微混合、擴展成 6ch，再以 0〜100 的數值透過 /power 傳送。' },
+  { tab: '撞擊', title: '輸入：撞擊（內建 IMU）', flow: 'IMU → 加速度變化 > 5G → /gravity',
+    text: '在階段 4，用 M5StickS3 內建的 IMU 監看加速度大小。與上一次的值相比變化超過 5G 時，只傳送一次 /gravity 給電腦（階段開始後 0.5 秒內忽略）。' },
+  { tab: '震動', title: '輸出：心跳震動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 震動馬達',
+    text: '在階段 2 以上從電腦收到 /heartrate 1 時，會輸出一次約 0.33 秒的震動。強度（PWM 值）依 0→220→220→130→40→80→0 變化。PWM 從 GPIO8 以 1kHz 輸出，經 DRV8833 放大後驅動震動馬達。' },
+  { tab: '電源', title: '電源：充電與電池監測', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電壓 → GPIO5',
+    text: 'TP4057 透過 USB-C 為 LiPo 充電。M5StickS3 會持續監測 LiPo 的電壓（GPIO5）以及是否正在充電（GPIO6）。LiPo 低於 3.55V，或本體電量低於 20% 時，紅色 LED 會閃爍。按鈕連按 2 次，會進入停止 Wi‑Fi 和震動的僅充電模式。' },
+];
+let LANG = 'ja';
+try {
+  const saved = localStorage.getItem('bd-lang');
+  LANG = saved === 'zh' || saved === 'ja' ? saved : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ja';
+} catch (e) { /* storage blocked: keep default */ }
+const ui = (k) => UI[LANG][k];
+const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
+const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
+
+
+// Sibling page link: the other artifact when this page is shown on Claude; otherwise the other page
+// next to this one, wherever it is served from. data-local lists the relative candidates —
+// npm run serve and dist/ give / ⇄ /headgear/, a server rooted at the project folder (e.g. VS Code
+// Live Server) gives /app/ ⇄ /headgear/app/ — and the first one whose model.json exists wins.
+{
+  const onClaude = /claude/i.test(location.hostname) || [...(location.ancestorOrigins || [])].some((o) => /claude/i.test(o));
+  for (const a of document.querySelectorAll('.sibling')) {
+    // installed as an app (home screen / PWA): never open a new tab, it would leave the app
+    const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    if (onClaude) { a.href = a.dataset.artifact; if (!standalone) { a.target = '_blank'; a.rel = 'noopener'; } continue; }
+    const tries = a.dataset.local.split(' ');
+    a.href = tries[0];
+    (async () => {
+      for (const t of tries) {
+        try { if ((await fetch(new URL(t + 'model.json', location.href), { method: 'HEAD', cache: 'no-store' })).ok) { a.href = t; return; } } catch (e) { /* try the next one */ }
+      }
+    })();
+  }
+}
+
+// ---------- Renderer / scene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// The light and the model stay put while the camera orbits, so the shadow map only needs
+// redrawing when parts move or change visibility (S.shadowDirty), not every frame.
+renderer.shadowMap.autoUpdate = false;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 1, 3000);
+const HOME = { pos: new THREE.Vector3(225, 188, 255), target: new THREE.Vector3(0, 38, 0) };
+camera.position.copy(HOME.pos);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME.target);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 60;
+controls.maxDistance = 1000;
+controls.autoRotateSpeed = 1.2;
+controls.autoRotate = true;  // on at start; the 自動回転 chip toggles it
+
+const key = new THREE.DirectionalLight(0xfff6ea, 1.8);
+key.position.set(160, 320, 180);  // far enough that the fully exploded stack stays inside the shadow camera
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -180, right: 180, top: 180, bottom: -180, near: 10, far: 700 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.25;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd4ff, 0.9);
+rim.position.set(-120, 60, -100);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.35));
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.ShadowMaterial({ opacity: 0.18 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.4;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// CAD is Z-up: rotate so CAD Z becomes the scene's height axis; centre the footprint.
+const root = new THREE.Group();
+root.rotation.x = -Math.PI / 2;
+root.position.set(0, 0, -9);
+scene.add(root);
+
+// ---------- State ----------
+const S = { shadowDirty: true, explode: 0, explodeShown: 0, ghost: false, selected: null, mode: 'explore', step: 0 };
+const meshParts = new Map(); // mesh -> part
+const partBoxes = {};        // part id -> Box3 in root-local (assembled)
+
+// ---------- Load ----------
+// model.json = { glb: base64 } — decoded here and parsed in memory
+const loadFail = (err) => {
+  document.getElementById('loading').textContent = ui('loadFail');
+  console.error(err);
+};
+fetch('model.json').then((r) => r.json()).then(({ glb }) => {
+  const bytes = Uint8Array.from(atob(glb), (c) => c.charCodeAt(0));
+  new GLTFLoader().parse(bytes.buffer, '', onModel, loadFail);
+}).catch(loadFail);
+function onModel(gltf) {
+  const meshes = [];
+  gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  const pathOf = (m) => (m.userData && m.userData.path) || '';
+  const claimed = new Set();
+  // claim order: the most specific selectors first, so the M5's screws / socket are not swallowed by m5
+  const order = [...PARTS].sort((a, b) => (a.id === 'm5') - (b.id === 'm5'));
+  for (const p of order) p.srcs = meshes.filter((m) => !claimed.has(m) && p.sel.test(pathOf(m)) && claimed.add(m));
+  const loose = meshes.filter((m) => !claimed.has(m));
+  if (loose.length) console.warn('meshes not in any part:', [...new Set(loose.map(pathOf))]);
+  for (const p of PARTS) {
+    p.objs = [];
+    const box = new THREE.Box3();
+    // One draw call per surface finish: a part's meshes that share a material are merged
+    // (e.g. the TP4057's 94 solids become a handful of meshes). Looks the same, far fewer draws.
+    const byFinish = new Map();
+    const over = p.finish === 'gel' ? GEL : p.finish;
+    for (const src of p.srcs) {
+      const hex = (src.userData && src.userData.c) || '';
+      if (p.paint) paintGel(src.geometry, p.paint);
+      const key = over ? 'part' : hex;
+      if (!byFinish.has(key)) byFinish.set(key, { f: { ...(FINISH[hex] || { metalness: 0, roughness: 0.5 }), ...(over || {}) }, geos: [] });
+      byFinish.get(key).geos.push(src.geometry);
+    }
+    for (const { f, geos } of byFinish.values()) {
+      const geo = geos.length > 1 ? mergeGeometries(geos) : geos[0];
+      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 1, ...f }));
+      m.castShadow = true; m.receiveShadow = true;
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 32),
+        new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
+      edges.raycast = () => {};
+      edges.visible = !p.paint;  // no CAD outlines on the organic gel
+      m.add(edges);
+      m.userData.edges = edges;
+      const holder = new THREE.Group();
+      holder.add(m);
+      root.add(holder);
+      p.objs.push(m);
+      meshParts.set(m, p);
+    }
+    p.holders = p.objs.map((m) => m.parent);
+    partBoxes[p.id] = box;
+    if (p.anchor === 'one' && p.srcs.length) {
+      // one box per physical unit (e.g. each of the 4 film sensors): merge source meshes that touch
+      const units = [];
+      for (const src of p.srcs) {
+        src.geometry.computeBoundingBox();
+        const b = src.geometry.boundingBox.clone();
+        for (let k = units.length - 1; k >= 0; k--) if (units[k].clone().expandByScalar(0.5).intersectsBox(b)) b.union(units.splice(k, 1)[0]);
+        units.push(b);
+      }
+      p.units = units;
+      p.anchorBox = units.reduce((a, b) => (b.max.x + b.min.x > a.max.x + a.min.x ? b : a));  // right-most
+    }
+  }
+  computeRises();
+  S.shadowDirty = true;
+  document.getElementById('loading').hidden = true;
+  buildCallouts();
+  applyLook();
+}
+
+// ---------- Explode ----------
+function partOffset(p, t) {
+  const a = Math.min(1, t / GROUP_SPLIT), b = Math.max(0, (t - GROUP_SPLIT) / (1 - GROUP_SPLIT));
+  return a * (p.rise1 || 0) + b * (p.rise2 || 0);
+}
+const stackRise = (t) => Math.max(...PARTS.map((p) => partOffset(p, t)));  // how far the top block has risen
+function computeRises() {
+  const top = (ps, r = () => 0) => Math.max(...ps.map((p) => partBoxes[p.id].max.z + r(p)));
+  const bottom = (ps) => Math.min(...ps.map((p) => partBoxes[p.id].min.z));
+  const of = (k) => PARTS.filter((p) => p.stack === k);
+  const cover = of('cover'), brain = of('brain'), shell = of('shell'), sensors = of('sensors'), arms = of('arms'), inner = of(undefined);
+  const group = [...inner, ...shell, ...sensors, ...arms];
+  // stage 2: the device group comes apart (relative to where stage 1 left it)
+  for (const p of inner) p.rise2 = p.layer * LAYER_GAP;
+  const shellRise = top(inner, (p) => p.rise2) + CLEARANCE - bottom(shell);
+  for (const p of shell) p.rise2 = shellRise;
+  const sensorRise = top(shell, (p) => p.rise2) + CLEARANCE - bottom(sensors);
+  for (const p of sensors) p.rise2 = sensorRise;
+  const armRise = top(sensors, (p) => p.rise2) + CLEARANCE - bottom(arms);
+  for (const p of arms) p.rise2 = armRise;
+  // stage 1: cover / device group / brain separate as three blocks
+  for (const p of cover) { p.rise1 = COVER_LIFT; p.rise2 = 0; }
+  const groupRise = top(cover) + COVER_LIFT + CLEARANCE - bottom(group);
+  for (const p of group) p.rise1 = groupRise;
+  const brainRise = top(group) + groupRise + CLEARANCE - bottom(brain);
+  const groupGrowth = top(group, (p) => p.rise2) - top(group);
+  for (const p of brain) { p.rise1 = brainRise; p.rise2 = groupGrowth; }
+}
+function updateExplode() {
+  const t = S.explodeShown, rise = stackRise(t);
+  for (const p of PARTS) if (p.holders) for (const h of p.holders) {
+    h.position.z = partOffset(p, t);
+    if (p.showFrom) h.visible = rise >= p.showFrom;
+  }
+}
+// world-space anchor on the top of a part (with current explode)
+const _v = new THREE.Vector3();
+function partPoint(p, where = 'top', box = null) {
+  const b = box || p.anchorBox || partBoxes[p.id];
+  _v.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, where === 'top' ? b.max.z : (b.min.z + b.max.z) / 2);
+  _v.z += partOffset(p, S.explodeShown);
+  return root.localToWorld(_v.clone());
+}
+
+// ---------- Height rail ----------
+const track = document.getElementById('track'), thumb = document.getElementById('thumb'), fill = document.getElementById('fill');
+const readout = document.getElementById('readout');
+for (let i = 0; i <= 6; i++) { const t = document.createElement('div'); t.className = 'tick'; t.style.bottom = (i / 6 * 100) + '%'; track.appendChild(t); }
+function setExplode(v) {
+  S.explode = Math.min(1, Math.max(0, v));
+  thumb.style.bottom = (S.explode * 100) + '%';
+  fill.style.height = (S.explode * 100) + '%';
+  track.setAttribute('aria-valuenow', Math.round(S.explode * 100));
+}
+function fromPointer(e) { const r = track.getBoundingClientRect(); setExplode(1 - (e.clientY - r.top) / r.height); }
+track.addEventListener('pointerdown', (e) => { track.setPointerCapture(e.pointerId); track.classList.add('dragging'); fromPointer(e); e.preventDefault(); });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) track.addEventListener(ev, () => track.classList.remove('dragging'));
+track.addEventListener('pointermove', (e) => { if (track.hasPointerCapture(e.pointerId)) fromPointer(e); });
+track.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setExplode(S.explode + 0.05);
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setExplode(S.explode - 0.05);
+  else return;
+  e.preventDefault();
+});
+setExplode(0);
+
+// ---------- Look: ghosting, highlight ----------
+const ACCENT = new THREE.Color();
+function readAccent() { ACCENT.set(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0088ff'); }
+readAccent();
+
+// See-through parts swap to a light material: at 6–16 % opacity clearcoat and sheen are invisible,
+// but on iPad they made the ghosted brain (a screen-filling, double-sided body) the slowest thing
+// on screen. Standard + one pass for both sides keeps the same colour and env reflections.
+function ghostMaterial(m) {
+  if (!m.userData.ghostMat) {
+    const s = m.userData.solidMat = m.material;
+    m.userData.ghostMat = new THREE.MeshStandardMaterial({
+      vertexColors: true, side: THREE.DoubleSide, forceSinglePass: true, transparent: true, depthWrite: false,
+      metalness: s.metalness, roughness: s.roughness, envMapIntensity: s.envMapIntensity,
+    });
+  }
+  return m.userData.ghostMat;
+}
+function setPartOpacity(p, a) {
+  for (const m of p.objs || []) {
+    const see = a < 0.999;
+    if (see) m.material = ghostMaterial(m);
+    else if (m.userData.solidMat) m.material = m.userData.solidMat;
+    const mat = m.material;
+    mat.opacity = a;
+    if (m.castShadow === see) S.shadowDirty = true;
+    m.castShadow = !see;
+    m.receiveShadow = !see;  // soft-shadow lookups per pixel, invisible at this opacity
+    m.userData.edges.material.opacity = 0.22 * a;
+    m.renderOrder = see ? 2 : 0;
+  }
+}
+function applyLook() {
+  const tour = S.mode === 'tour' ? TOUR[S.step] : null;
+  const focus = tour && tour.parts.length ? new Set(tour.parts) : null;
+  const ghostShell = tour ? true : S.ghost;
+  for (const p of PARTS) {
+    let a = 1;
+    if (p.ghost && ghostShell) a = 0.1;
+    if (focus && !focus.has(p.id)) a = Math.min(a, p.ghost ? 0.06 : 0.16);
+    setPartOpacity(p, a);
+    // a faint glow only: keep the real part colours readable
+    const hi = S.mode === 'explore' && S.selected === p;
+    for (const m of p.objs || []) {
+      m.material.emissive.copy(hi ? ACCENT : new THREE.Color(0)); m.material.emissiveIntensity = hi ? 0.04 : 0;
+      const em = m.userData.edges.material;
+      em.color.set(hi ? ACCENT : 0x0d1015);
+      if (hi) em.opacity = 0.95;
+    }
+  }
+  for (const c of callouts) c.el.classList.toggle('is-on', S.mode === 'explore' && S.selected === c.part);
+  if (callouts.length) layoutCallouts();  // swap labels right away, not on the next frame
+}
+
+// ---------- Callouts (leader lines + names) ----------
+const svg = document.getElementById('leaders'), labelsEl = document.getElementById('labels');
+const callouts = [];
+// every part gets a callout; which ones show depends on the mode (see visibleCallouts)
+function buildCallouts() {
+  for (const p of PARTS) {
+    const el = document.createElement('div');
+    el.className = 'callout glass';
+    el.addEventListener('click', () => select(p));
+    labelsEl.appendChild(el);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', 4.5);
+    svg.append(path, dot);
+    callouts.push({ part: p, el, path, dot });
+  }
+  renderCalloutText();
+}
+function renderCalloutText() {
+  for (const { part: p, el } of callouts) el.innerHTML = `<span class="ref">${p.ref}</span><b>${P(p, 'name')}</b><small>${P(p, 'sub') || p.en}</small>`;
+}
+const _p = new THREE.Vector3();
+function toScreen(v) { _p.copy(v).project(camera); return { x: (_p.x + 1) / 2 * innerWidth, y: (1 - _p.y) / 2 * innerHeight, z: _p.z }; }
+function modelScreenBounds() {
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of PARTS) {
+    const b = partBoxes[p.id]; if (!b) continue;
+    const off = partOffset(p, S.explodeShown);
+    for (let k = 0; k < 8; k++) {
+      const v = new THREE.Vector3(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, (k & 4 ? b.max.z : b.min.z) + off);
+      const s = toScreen(root.localToWorld(v));
+      minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+    }
+  }
+  return { minX, maxX, cx: (minX + maxX) / 2 };
+}
+// しくみ: only the parts the current step talks about.
+// 観察: none (tapping a part opens its card instead).
+function visibleCallouts() {
+  if (S.mode === 'tour') {
+    const ids = new Set(TOUR[S.step].labels || TOUR[S.step].parts);
+    return callouts.filter((c) => ids.has(c.part.id));
+  }
+  return [];
+}
+function layoutCallouts() {
+  const items = visibleCallouts();
+  for (const c of callouts) { const on = items.includes(c); c.el.hidden = !on; c.path.style.display = c.dot.style.display = on ? '' : 'none'; }
+  if (!items.length) return;
+  const bounds = modelScreenBounds();
+  const placed = items.map((c) => ({ c, a: toScreen(partPoint(c.part)) }));
+  const sides = { left: [], right: [] };
+  for (const it of placed) sides[it.a.x < bounds.cx ? 'left' : 'right'].push(it);
+  // keep one label per side if everything bunched: move the furthest-left of the right group over
+  if (!sides.left.length && sides.right.length > 1) sides.left.push(sides.right.sort((a, b) => a.a.x - b.a.x).shift());
+  if (!sides.right.length && sides.left.length > 1) sides.right.push(sides.left.sort((a, b) => b.a.x - a.a.x).shift());
+  // keep left-hand labels clear of the tour card when it sits on the left
+  const tourBox = !tourEl.hidden ? tourEl.getBoundingClientRect() : null;
+  const margin = tourBox && tourBox.left < 40 ? tourBox.right + 16 : 16, gapX = 36, minGap = 58;
+  const top = 110, bottom = innerHeight - 90;
+  for (const side of ['left', 'right']) {
+    const list = sides[side].sort((a, b) => a.a.y - b.a.y);
+    let lastY = -Infinity;
+    for (const it of list) {
+      const w = it.c.el.offsetWidth, h = it.c.el.offsetHeight;
+      let y = Math.max(top, Math.min(bottom - h, it.a.y - h - 18));
+      if (y < lastY + minGap) y = lastY + minGap;
+      lastY = y;
+      let x = side === 'left' ? Math.min(bounds.minX - gapX - w, it.a.x - 60 - w) : Math.max(bounds.maxX + gapX, it.a.x + 60);
+      x = side === 'left' ? Math.max(margin, Math.min(innerWidth - w - 96, x)) : Math.max(16, Math.min(innerWidth - w - 96, x));
+      it.c.el.style.transform = `translate(${x}px, ${y}px)`;
+      const ey = y + h / 2, ex = side === 'left' ? x + w : x;
+      const knee = side === 'left' ? ex + 18 : ex - 18;
+      it.c.path.setAttribute('d', `M${it.a.x},${it.a.y} L${knee},${ey} L${ex},${ey}`);
+      it.c.dot.setAttribute('cx', it.a.x); it.c.dot.setAttribute('cy', it.a.y);
+    }
+  }
+}
+
+// ---------- Selection ----------
+const sheet = document.getElementById('sheet');
+function renderSheet(p) {
+  document.getElementById('s-ref').textContent = `${p.ref} · ${p.en}`;
+  document.getElementById('s-name').textContent = P(p, 'name');
+  document.getElementById('s-desc').textContent = P(p, 'desc');
+  document.getElementById('s-spec').innerHTML = (P(p, 'spec') || []).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+function select(p) {
+  S.selected = p;
+  if (!p) { sheet.hidden = true; applyLook(); return; }
+  renderSheet(p);
+  sheet.hidden = false;
+  // internal parts sit inside the shell: see-through on so the selection is visible
+  if (!p.ghost && !S.ghost) document.getElementById('t-ghost').click();
+  applyLook();
+}
+document.getElementById('sheet-close').addEventListener('click', () => select(null));
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!down || S.mode !== 'explore') return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
+  down = null;
+  if (moved > 8 || dt > 500) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects([...meshParts.keys()], false).filter((h) => h.object.material.opacity > 0.5 && h.object.parent.visible);
+  select(hits.length ? meshParts.get(hits[0].object) : null);
+});
+
+// ---------- Tools ----------
+const toggle = (id, fn) => { const b = document.getElementById(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); fn(on); }); };
+toggle('t-ghost', (on) => { S.ghost = on; applyLook(); });
+toggle('t-spin', (on) => { controls.autoRotate = on; });
+// 視点を戻す: ease toward the home view for a short while. It must always end — with auto-rotate on
+// the camera never quite reaches the goal, and a fly left running would keep pulling the view back.
+let fly = null;
+const FLY_MS = 1200;
+function flyTo(pos, target) { fly = { pos: pos.clone(), target: target.clone(), until: performance.now() + FLY_MS }; }
+controls.addEventListener('start', () => { fly = null; });  // the user takes over: stop at once
+const viewTargetY = (t) => 38 + stackRise(t) * 0.5;
+const zoomFactor = (t) => 1 + stackRise(t) / 160;
+document.getElementById('t-reset').addEventListener('click', () => {
+  const t = S.explodeShown, target = new THREE.Vector3(0, viewTargetY(t), 0);
+  flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target);
+});
+
+// ---------- Modes & tour ----------
+const tourEl = document.getElementById('tour'), stepsEl = document.getElementById('steps');
+TOUR.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.addEventListener('click', () => goStep(i));
+  stepsEl.appendChild(b);
+});
+function renderTourText() {
+  [...stepsEl.children].forEach((b, i) => { b.innerHTML = `<span>${i + 1}</span>${T(i, 'tab')}`; });
+  document.getElementById('tour-title').textContent = T(S.step, 'title');
+  document.getElementById('tour-flow').textContent = T(S.step, 'flow');
+  document.getElementById('tour-text').textContent = T(S.step, 'text');
+}
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('mode-explore').setAttribute('aria-pressed', m === 'explore');
+  document.getElementById('mode-tour').setAttribute('aria-pressed', m === 'tour');
+  document.body.classList.toggle('touring', m === 'tour');
+  tourEl.hidden = m !== 'tour';
+  if (m === 'tour') { select(null); goStep(S.step); } else { flow.visible = false; applyLook(); }
+}
+function goStep(i) {
+  S.step = (i + TOUR.length) % TOUR.length;
+  const s = TOUR[S.step];
+  [...stepsEl.children].forEach((b, k) => k === S.step ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  renderTourText();
+  setExplode(s.explode);
+  applyLook();
+}
+
+// Language switch: re-renders every text in place (keeps view, step and explode as they are)
+function setLang(l) {
+  LANG = l;
+  try { localStorage.setItem('bd-lang', l); } catch (e) { /* storage blocked: choice lasts this visit */ }
+  document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
+  document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
+  document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    if (el.id === 'loading' && el.hidden) return;
+    el.textContent = ui(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => el.setAttribute('aria-label', ui(el.dataset.i18nAria)));
+  renderTourText();
+  renderCalloutText();
+  if (S.selected) renderSheet(S.selected);
+  if (callouts.length) layoutCallouts();
+}
+document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
+document.getElementById('lang-zh').addEventListener('click', () => setLang('zh'));
+setLang(LANG);
+document.getElementById('mode-explore').addEventListener('click', () => setMode('explore'));
+document.getElementById('mode-tour').addEventListener('click', () => setMode('tour'));
+document.getElementById('tour-prev').addEventListener('click', () => goStep(S.step - 1));
+document.getElementById('tour-next').addEventListener('click', () => goStep(S.step + 1));
+
+// Signal flow: a line through part centres plus pulses travelling along it. A path that starts at a
+// part made of several units (the 4 pressure sensors) branches: one line from each unit.
+const flow = new THREE.Group(); flow.visible = false; scene.add(flow);
+const FLOW_N = 96, FLOW_MAX = 4, PULSES = 5;
+const flowLines = Array.from({ length: FLOW_MAX }, () => {
+  const line = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(FLOW_N * 3), 3)),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false }));
+  line.renderOrder = 10; flow.add(line);
+  line.pulses = Array.from({ length: PULSES }, () => {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true }));
+    s.renderOrder = 11; flow.add(s); return s;
+  });
+  return line;
+});
+function updateFlow(time) {
+  const s = TOUR[S.step];
+  if (S.mode !== 'tour' || !s.path || s.path.length < 2) { flow.visible = false; return; }
+  flow.visible = true;
+  const first = byId[s.path[0]];
+  const starts = (first.units || [null]).slice(0, FLOW_MAX).map((box) => partPoint(first, 'mid', box));
+  const rest = s.path.slice(1).map((id) => partPoint(byId[id], 'mid'));
+  flowLines.forEach((line, n) => {
+    const on = n < starts.length;
+    line.visible = on; line.pulses.forEach((p) => { p.visible = on; });
+    if (!on) return;
+    const pts = [starts[n], ...rest], curvePts = [];
+    for (let i = 0; i < pts.length; i++) {
+      curvePts.push(pts[i]);
+      if (i < pts.length - 1) { const m = pts[i].clone().lerp(pts[i + 1], 0.5); m.y += 10; curvePts.push(m); }
+    }
+    const curve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal');
+    const arr = line.geometry.attributes.position.array;
+    for (let i = 0; i < FLOW_N; i++) curve.getPoint(i / (FLOW_N - 1)).toArray(arr, i * 3);
+    line.geometry.attributes.position.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+    line.material.color.copy(ACCENT);
+    line.pulses.forEach((p, k) => {
+      const u = ((time * 0.00025) + k / PULSES + n * 0.13) % 1;  // branches slightly out of step
+      curve.getPoint(u, p.position);
+      p.material.color.copy(ACCENT);
+      p.material.opacity = Math.sin(u * Math.PI);
+    });
+  });
+}
+
+// ---------- Liquid Glass (WebGL) ----------
+// Approach from the community web recreations (kube.io write-up, archisvaze/liquid-glass WebGL
+// renderer): the 3D scene is rendered to a texture, then one full-screen pass draws every visible
+// `.glass` element as a rounded-rect lens over it. The bezel follows a convex squircle profile,
+// refraction offset comes from Snell's law, the body is a mip-blurred, whitened sample, and a
+// directional specular rim sits on the edge. SVG backdrop filters only work in Chromium, so this
+// is what makes the effect real on iPad Safari. Falls back to the CSS blur when unavailable.
+const GLASS_MAX = 16;
+const useGLGlass = renderer.capabilities.isWebGL2 && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
+const hdr = renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float');
+const sceneRT = new THREE.WebGLRenderTarget(1, 1, {
+  samples: 4, type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+  minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
+});
+// The frosted glass samples a blurred copy. Building mipmaps of the full-res scene every frame is
+// costly on iPad, so the scene is box-filtered down to 1/4 size first and the mips are built there.
+// The same LOD bias then lands on the same blur level (a 1/4-size texture starts 2 mip levels down).
+const smallRT = new THREE.WebGLRenderTarget(1, 1, {
+  type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType,
+  minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true,
+});
+const downMat = new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+  uniforms: { uScene: { value: sceneRT.texture }, uTexel: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  // 4 bilinear taps at +-1 texel = the exact average of the 4x4 block under each output pixel
+  fragmentShader: /* glsl */`
+    uniform sampler2D uScene; uniform vec2 uTexel; varying vec2 vUv;
+    void main() {
+      gl_FragColor = 0.25 * (texture2D(uScene, vUv + vec2(-uTexel.x, -uTexel.y)) + texture2D(uScene, vUv + vec2(uTexel.x, -uTexel.y))
+                           + texture2D(uScene, vUv + vec2(-uTexel.x,  uTexel.y)) + texture2D(uScene, vUv + vec2(uTexel.x,  uTexel.y)));
+    }`,
+});
+const downScene = new THREE.Scene();
+const downQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), downMat);
+downQuad.frustumCulled = false;
+downScene.add(downQuad);
+const glassMat = new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false,
+  uniforms: {
+    uScene: { value: sceneRT.texture }, uSmall: { value: smallRT.texture }, uRes: { value: new THREE.Vector2(1, 1) }, uDpr: { value: 1 },
+    uCount: { value: 0 },
+    uRects: { value: Array.from({ length: GLASS_MAX }, () => new THREE.Vector4()) },
+    uRadii: { value: new Array(GLASS_MAX).fill(0) },
+    uIOR: { value: 1.5 }, uThick: { value: 28 }, uBezel: { value: 18 },
+    uTint: { value: 0.32 }, uSpec: { value: 0.55 }, uBlur: { value: 3.2 },
+  },
+  vertexShader: /* glsl */`
+    void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D uScene, uSmall;
+    uniform vec2 uRes; uniform float uDpr; uniform int uCount;
+    uniform vec4 uRects[${GLASS_MAX}]; uniform float uRadii[${GLASS_MAX}];
+    uniform float uIOR, uThick, uBezel, uTint, uSpec, uBlur;
+
+    vec3 toLin(vec3 c) { return pow(c, vec3(2.2)); }
+    // same soft studio backdrop as the CSS body background (sRGB authored, composed in linear)
+    vec3 backdrop(vec2 uv) {
+      vec2 p = vec2(uv.x, 1.0 - uv.y); float asp = uRes.x / uRes.y;
+      float d = length((p - vec2(0.45, 0.45)) * vec2(asp, 1.0) / vec2(0.9 * asp, 0.8));
+      vec3 c = mix(vec3(1.0), vec3(0.961, 0.961, 0.969), smoothstep(0.0, 0.45, d));
+      c = mix(c, vec3(0.910, 0.910, 0.929), smoothstep(0.45, 1.0, d));
+      float b = length((p - vec2(0.7, 0.2)) * vec2(asp, 1.0) / vec2(0.6 * asp, 0.5));
+      c = mix(c, vec3(0.0, 0.533, 1.0), 0.07 * (1.0 - smoothstep(0.0, 0.7, b)));
+      float o = length((p - vec2(0.15, 0.85)) * vec2(asp, 1.0) / vec2(0.5 * asp, 0.45));
+      c = mix(c, vec3(1.0, 0.584, 0.0), 0.05 * (1.0 - smoothstep(0.0, 0.7, o)));
+      return toLin(c);
+    }
+    // scene texture is premultiplied, linear, not yet tone-mapped; bias > 0 reads the blurred copy
+    vec3 sceneAt(vec2 uv, float bias) {
+      uv = clamp(uv, vec2(0.0), vec2(1.0));
+      vec4 s = bias > 0.0 ? texture2D(uSmall, uv, bias) : texture2D(uScene, uv);
+      vec3 c = s.a > 0.0001 ? toneMapping(s.rgb / s.a) : vec3(0.0);
+      return c * s.a + backdrop(uv) * (1.0 - s.a);
+    }
+    float sdRR(vec2 p, vec2 h, float r) {
+      vec2 q = abs(p) - h + r;
+      return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+    }
+    float surf(float t) { float s = 1.0 - t; return pow(1.0 - s * s * s * s, 0.25); }  // convex squircle
+
+    void main() {
+      vec2 frag = gl_FragCoord.xy;
+      vec2 uv = frag / uRes;
+      float best = 1e9, shadow = 1e9, rB = 0.0; vec2 pB = vec2(0.0), hB = vec2(1.0);
+      for (int i = 0; i < ${GLASS_MAX}; i++) {
+        if (i >= uCount) break;
+        vec4 R = uRects[i]; float r = uRadii[i];
+        vec2 p = frag - R.xy;
+        float sd = sdRR(p, R.zw, r);
+        if (sd < best) { best = sd; pB = p; hB = R.zw; rB = r; }
+        shadow = min(shadow, sdRR(p + vec2(0.0, 5.0 * uDpr), R.zw, r));
+      }
+      vec3 col = sceneAt(uv, 0.0);
+      // soft contact shadow below each floating pane
+      float sh = exp(-max(shadow, 0.0) * max(shadow, 0.0) / (420.0 * uDpr * uDpr));
+      col *= 1.0 - 0.09 * sh * step(0.0, best);
+
+      if (best < 0.0) {
+        float dist = -best;
+        float bezel = max(min(uBezel * uDpr, min(rB, min(hB.x, hB.y)) - 1.0), 1.0);
+        float thick = uThick * uDpr;
+        float t = clamp(dist / bezel, 0.0, 1.0);
+        float h = surf(t);
+        float dh = (surf(min(t + 0.002, 1.0)) - h) / 0.002;
+        float slope = atan(dh * thick / bezel);
+        float thetaR = asin(clamp(sin(slope) / uIOR, -1.0, 1.0));
+        float disp = h * thick * (tan(slope) - tan(thetaR));
+        vec2 grad = normalize(vec2(sdRR(pB + vec2(0.5, 0.0), hB, rB) - best, sdRR(pB + vec2(0.0, 0.5), hB, rB) - best) + 1e-6);
+        vec2 off = -grad * disp / uRes;
+        // frosted body: mip blur + a few taps, slight dispersion on the bezel
+        vec2 px = uDpr * 5.0 / uRes;
+        vec3 g = sceneAt(uv + off, uBlur) * 0.4
+               + sceneAt(uv + off + vec2( px.x,  px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2(-px.x,  px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2( px.x, -px.y), uBlur) * 0.15
+               + sceneAt(uv + off + vec2(-px.x, -px.y), uBlur) * 0.15;
+        float edge = 1.0 - t;
+        g.r = mix(g.r, sceneAt(uv + off * 1.12, uBlur).r, edge * 0.6);
+        g.b = mix(g.b, sceneAt(uv + off * 0.88, uBlur).b, edge * 0.6);
+        float l = dot(g, vec3(0.2126, 0.7152, 0.0722));
+        g = mix(vec3(l), g, 1.35);                       // vibrancy
+        g = mix(g, vec3(1.0), uTint);                     // iOS 27: a little more opaque
+        // specular rim, light from the upper left; the far edge catches a weaker bounce
+        vec2 L = normalize(vec2(-0.45, 0.9));
+        float rim = max(dot(grad, L), 0.0) + 0.35 * max(-dot(grad, L), 0.0);
+        float fall = 1.0 - smoothstep(0.0, bezel * 0.55, dist);
+        g += vec3(pow(rim * fall, 1.6) * uSpec);
+        float line = smoothstep(0.0, 1.2 * uDpr, dist) * (1.0 - smoothstep(1.2 * uDpr, 2.6 * uDpr, dist));
+        g += vec3(line * 0.18);
+        col = mix(col, g, smoothstep(0.0, 1.2 * uDpr, dist));
+      }
+      gl_FragColor = linearToOutputTexel(vec4(col, 1.0));
+    }`,
+});
+const glassScene = new THREE.Scene();
+const glassQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glassMat);
+glassQuad.frustumCulled = false;
+glassScene.add(glassQuad);
+const glassCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const glassRadius = new WeakMap();
+if (useGLGlass) document.body.classList.add('gl-glass');
+
+// read every visible .glass element's rect (device px, y up) into the shader uniforms
+function updateGlassRects() {
+  const dpr = renderer.getPixelRatio(), H = innerHeight, u = glassMat.uniforms;
+  let n = 0;
+  for (const el of document.querySelectorAll('.glass')) {
+    if (n >= GLASS_MAX || !el.getClientRects().length) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    if (!glassRadius.has(el)) glassRadius.set(el, parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0);
+    const rad = Math.min(glassRadius.get(el), r.width / 2, r.height / 2);
+    u.uRects.value[n].set((r.left + r.width / 2) * dpr, (H - r.top - r.height / 2) * dpr, r.width / 2 * dpr, r.height / 2 * dpr);
+    u.uRadii.value[n] = rad * dpr;
+    n++;
+  }
+  u.uCount.value = n;
+}
+
+// ---------- Loop ----------
+function resize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+  sceneRT.setSize(buf.x, buf.y);
+  smallRT.setSize(Math.ceil(buf.x / 4), Math.ceil(buf.y / 4));
+  downMat.uniforms.uTexel.value.set(1 / buf.x, 1 / buf.y);
+  glassMat.uniforms.uRes.value.copy(buf);
+  glassMat.uniforms.uDpr.value = renderer.getPixelRatio();
+  svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+  svg.setAttribute('width', innerWidth); svg.setAttribute('height', innerHeight);
+}
+addEventListener('resize', resize);
+resize();
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+renderer.setAnimationLoop((time) => {
+  const k = reduce ? 1 : 0.14;
+  const prevT = S.explodeShown;
+  S.explodeShown += (S.explode - S.explodeShown) * k;
+  if (Math.abs(S.explode - S.explodeShown) < 1e-4) S.explodeShown = S.explode;
+  // touch the DOM only when the number changes (a write before the glass rect reads forces a layout)
+  const mm = Math.round(stackRise(S.explodeShown));
+  if (mm !== S.readoutMm) { S.readoutMm = mm; readout.innerHTML = `+${mm}<br>mm`; }
+  if (prevT !== S.explodeShown) S.shadowDirty = true;
+  updateExplode();
+  // while the stack grows or shrinks, move the view by the same amount so it stays in frame.
+  // Only the change is applied, so wherever the user has panned / zoomed to is kept.
+  if (!fly && prevT !== S.explodeShown) {
+    const dy = viewTargetY(S.explodeShown) - viewTargetY(prevT);
+    controls.target.y += dy; camera.position.y += dy;
+    const ratio = zoomFactor(S.explodeShown) / zoomFactor(prevT);
+    camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);
+  }
+  if (fly) {
+    camera.position.lerp(fly.pos, 0.12); controls.target.lerp(fly.target, 0.12);
+    if (camera.position.distanceTo(fly.pos) < 0.5 || performance.now() > fly.until) fly = null;
+  }
+  controls.update();
+  updateFlow(time);
+  if (callouts.length) layoutCallouts();
+  if (S.shadowDirty) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; }
+  if (useGLGlass) {
+    renderer.setRenderTarget(sceneRT);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(smallRT);
+    renderer.render(downScene, glassCam);
+    renderer.setRenderTarget(null);
+    updateGlassRects();
+    renderer.render(glassScene, glassCam);
+  } else {
+    renderer.render(scene, camera);
+  }
+});
+</script>
+

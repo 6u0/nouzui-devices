@@ -1,0 +1,10 @@
+{
+  "name": "脳デバイスの中身",
+  "short_name": "脳デバイス",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#f5f5f7"
+}

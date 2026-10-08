@@ -1,0 +1,4 @@
+{
+  "_shift": "CAD placement error in 'brain device2.step': the gel brain + its base cover sit off the device. Moving them by 'by' (mm) puts the device into the brain's inner cavity (voxel fit: device-in-gel 16% -> 0.6% of surface points, max ~2 mm). Remove once fixed in CAD.",
+  "shift": { "parts": ["brain", "brain_cover"], "by": [0, -9.5, -18.5] }
+}

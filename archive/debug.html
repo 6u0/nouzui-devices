@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>body{margin:0;background:#ddd}</style></head>
+<body>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0xdddddd);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 1, 2000); cam.position.set(90, 80, 120);
+const c = new OrbitControls(cam, r.domElement); c.target.set(0, 18, -5);
+s.add(new THREE.HemisphereLight(0xffffff, 0x666666, 2)); const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(50, 100, 80); s.add(d);
+const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; s.add(root);
+window.M = {};
+new GLTFLoader().load('model.glb', (g) => {
+  root.add(g.scene);
+  g.scene.traverse((o) => { if (o.isMesh) { const i = +o.name.slice(1); o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide }); M[i] = o; } });
+});
+window.show = (list) => { for (const k in M) M[k].visible = !list || list.includes(+k); };
+window.setCam = (x, y, z) => { cam.position.set(x, y, z); c.update(); };
+(function loop() { requestAnimationFrame(loop); c.update(); r.render(s, cam); })();
+</script></body></html>
