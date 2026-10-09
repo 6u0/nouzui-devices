@@ -6,7 +6,7 @@
 const fs = require('fs'), path = require('path');
 const src = process.argv[2] || 'app', out = process.argv[3] || 'dist';
 const page = fs.readFileSync(path.join(src, 'index.html'), 'utf8');
-const optionalFiles = ['model.json', 'manifest.webmanifest', 'sw.js', 'pwa-icon.svg'];
+const optionalFiles = ['model.json', 'manifest.webmanifest', 'sw.js', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 const head = `<!doctype html>
 <html lang="ja">
 <head>

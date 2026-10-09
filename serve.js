@@ -7,7 +7,7 @@ const dir = process.argv[2] || 'app';
 const root = path.join(__dirname, dir);
 const port = +(process.argv[3] || process.env.PORT || 5173);
 const mounts = dir === 'app' ? { '/headgear/': path.join(__dirname, 'headgear', 'app') } : {};
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.css': 'text/css', '.webmanifest': 'application/manifest+json' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 http.createServer((req, res) => {
   let url = decodeURIComponent(req.url.split('?')[0]);
   const prefix = Object.keys(mounts).find((m) => url === m.slice(0, -1) || url.startsWith(m));
