@@ -1,8 +1,7 @@
 <title>Headgear Inside</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<!-- scope "/" in the manifest keeps both pages inside the installed app (PWA), whichever way the
-     folder is served; without it the scope is just this page's folder and the other page opens
-     outside the app -->
+<!-- the manifest scope is "../", the brain page's folder that holds this one: moving between the
+     two pages stays inside the installed app (PWA) wherever it is served -->
 <link rel="manifest" href="manifest.webmanifest">
 <!-- iPad / iPhone home screen: Safari ignores the manifest icons and uses this PNG -->
 <link rel="apple-touch-icon" href="apple-touch-icon.png">

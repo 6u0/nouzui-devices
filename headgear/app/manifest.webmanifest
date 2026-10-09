@@ -3,7 +3,7 @@
   "short_name": "ヘッドギア",
   "lang": "ja",
   "start_url": "./",
-  "scope": "./",
+  "scope": "../",
   "display": "standalone",
   "background_color": "#f5f5f7",
   "theme_color": "#f5f5f7",
