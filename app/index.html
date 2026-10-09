@@ -1034,10 +1034,12 @@ function flyTo(pos, target) { fly = { pos: pos.clone(), target: target.clone(), 
 controls.addEventListener('start', () => { fly = null; });  // the user takes over: stop at once
 const viewTargetY = (t) => 38 + stackRise(t) * 0.5;
 const zoomFactor = (t) => 1 + stackRise(t) / 160;
-document.getElementById('t-reset').addEventListener('click', () => {
-  const t = S.explodeShown, target = new THREE.Vector3(0, viewTargetY(t), 0);
+// the home view, framed for explode t (the stack's height and centre change with it)
+function flyHome(t) {
+  const target = new THREE.Vector3(0, viewTargetY(t), 0);
   flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target);
-});
+}
+document.getElementById('t-reset').addEventListener('click', () => flyHome(S.explodeShown));
 
 // ---------- Modes & tour ----------
 const tourEl = document.getElementById('tour'), stepsEl = document.getElementById('steps');
@@ -1066,6 +1068,8 @@ function goStep(i) {
   [...stepsEl.children].forEach((b, k) => k === S.step ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
   renderTourText();
   setExplode(s.explode);
+  // every step starts from the home view framed for its explode, wherever the last one was turned to
+  flyHome(S.explode);
   applyLook();
 }
 
