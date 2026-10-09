@@ -139,6 +139,10 @@ npm run convert            # python step-mesh.py → step-colors.js → to-glb.j
 - 影マップは、部品が動いたときや表示が変わったときだけ更新（`renderer.shadowMap.autoUpdate = false`、`S.shadowDirty`）。カメラが回るだけなら影は変わらないため。
 - 分解量の数字は値が変わったときだけ書き換える（毎フレーム書くと、ガラス位置の読み取りで強制レイアウトが起きるため）。
 - ガラスのぼかしは、シーンを1/4に縮小したテクスチャ（`smallRT`）からミップマップを作る。全画面のミップマップ生成をやめた。同じ LOD バイアスで同じぼけ量になる。
+- 不透明な部品は片面描画（DoubleSide をやめた）。CADの三角形のうち、法線と向きが逆の約0.05%は読み込み時に向きを直す（`splitByFinish()`）。
+- 輪郭線は、ラベルと細かい金属部品（`NO_EDGES`：label / tin / gold）には描かない。ヘッドギアでは線が11万本から5.2万本に減った。
+- 見えないほど薄いクリアコート（白いPLA 0.08、樹脂・エポキシ 0.1〜0.15）は外した。画面の大半で2層目の反射計算が走っていたため。
+- 影マップは、部品が動き続けている間（サーボのデモ・分解）は1フレームおきに更新する。止まれば必ず最新になる。
 - 半透明（外装を透かす・しくみで強調外）の部品は、軽いマテリアルに差し替える（`ghostMaterial()`）。
   - クリアコート・シーンなしの MeshStandard。両面を1回で描く（`forceSinglePass`）。影も受けない。
   - 不透明度 6〜16% ではクリアコートなどの差は見えない。透けた脳が画面の大半を覆うため、ここが iPad で最も重かった。
@@ -234,7 +238,9 @@ npm run build              # dist/headgear/ にも出力
 
 **変換の設定（`headgear/` 内のファイル）**
 - `step-mesh.config.json`：`{ "min_deflection": 0.05, "angle": 1.0 }`。ESP32 ボードなどの細かい部品が多いので、メッシュを粗めにする（約 24万ポリゴン）。
-- `to-glb.config.json`：`{ "compact": true }`。法線・色を16bit整数、インデックスを16bitで保存（KHR_mesh_quantization）。model.json を Artifact の上限 16MB 未満（約 14MB）に収めるため。
+- `to-glb.config.json`：`{ "compact": true, "simplify": 0.03 }`。
+  - `simplify`：形の誤差0.03mm以内でポリゴンを間引く（meshoptimizer）。CADの面の輪郭は固定なので、色・輪郭線・部品同士の合わせ目は変わらない。24.5万 → 20.8万ポリゴン、10.6MB → 9.5MB。
+  - `compact`：法線・色を16bit整数、インデックスを16bitで保存（KHR_mesh_quantization）。model.json を Artifact の上限 16MB 未満（約 14MB）に収めるため。
 
 **共用スクリプトの変更点（脳デバイスの出力は変わらないことを確認済み）**
 - `step-colors.js` がソリッドごとの頂点の外形（`box`）も出す。`to-glb.js` は「面の数＋外形」で名前を照合し、外形が一致したときだけ `COMPOUND` を部品名に置き換える。

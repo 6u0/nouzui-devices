@@ -368,9 +368,9 @@ const MAT = {
   alu:     { metalness: 1, roughness: 0.4, env: 1 },   // electrolytic can
   mask:    { metalness: 0, roughness: 0.55, clearcoat: 1, clearcoatRoughness: 0.1, env: 0.85 },  // solder mask over FR4
   fr4:     { metalness: 0, roughness: 0.75 },               // bare board edge / substrate
-  epoxy:   { metalness: 0, roughness: 0.62, clearcoat: 0.15, clearcoatRoughness: 0.5 },  // IC / resistor bodies
+  epoxy:   { metalness: 0, roughness: 0.6 },  // IC / resistor bodies
   ceramic: { metalness: 0, roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4 },
-  nylon:   { metalness: 0, roughness: 0.55, clearcoat: 0.1, clearcoatRoughness: 0.5 },  // headers, terminal blocks
+  nylon:   { metalness: 0, roughness: 0.55 },  // headers, terminal blocks
   case:    { metalness: 0, roughness: 0.45, clearcoat: 0.2, clearcoatRoughness: 0.35, env: 0.7 },  // moulded servo cases: satin
   horn:    { metalness: 0, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.35 },
   label:   { metalness: 0, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.02, env: 1.2 },   // laminated stickers: mirror gloss
@@ -384,6 +384,9 @@ const MAT = {
   silver:  { metalness: 1, roughness: 0.38, env: 1 },       // printed silver electrode
   matte:   { metalness: 0, roughness: 0.6 },                // white stiffener
 };
+// No CAD outlines on these: the label lettering and the hundreds of tiny pins / pads / leads made
+// over half of all outline segments, drawn as dark fuzz; metal already reads by its reflections.
+const NO_EDGES = new Set(['label', 'tin', 'gold']);
 // [path test, { face colour: finish }]: the first rule whose path matches and that names the colour
 // wins (colours match within a few steps, the bake rounds them). Unlisted colours fall to GENERIC.
 const FINISH_RULES = [
@@ -418,26 +421,39 @@ function finishOf(path, rgb) {
   for (const [re, map] of FINISH_RULES) if (re.test(path)) { const f = near(map, rgb); if (f) return f; }
   return near(GENERIC, rgb) || 'nylon';
 }
-// Split a mesh's triangles by finish (face colour → finishOf). Returns [[finish, geometry], …].
-function splitByFinish(geo, path) {
-  const col = geo.attributes.color, idx = geo.index, n = idx ? idx.count : geo.attributes.position.count;
-  const c = new THREE.Color(), memo = new Map(), tris = new Map();
+// Split a mesh's triangles by finish (face colour → finishOf, or every face to `only`). Returns
+// [[finish, geometry], …]. Solids are drawn one-sided (half the raster work of DoubleSide), so the
+// few triangles whose winding disagrees with their normals (~0.05 % of the CAD tessellation) are
+// turned round here; a mesh with none of them, one finish and plain attributes passes through.
+function splitByFinish(geo, path, only) {
+  const col = geo.attributes.color, nor = geo.attributes.normal, pos = geo.attributes.position;
+  const idx = geo.index, n = idx ? idx.count : pos.count, vi = (t) => (idx ? idx.getX(t) : t);
+  const c = new THREE.Color(), memo = new Map(), tris = new Map(), flip = new Set();
+  const p0 = new THREE.Vector3(), p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), sn = new THREE.Vector3();
   for (let t = 0; t < n; t += 3) {
-    const v = idx ? idx.getX(t) : t;
-    const key = col ? c.setRGB(col.getX(v), col.getY(v), col.getZ(v), THREE.LinearSRGBColorSpace).getHex() : -1;
-    let f = memo.get(key);
-    if (f === undefined) memo.set(key, f = col ? finishOf(path, key) : 'nylon');
+    const a = vi(t), b = vi(t + 1), d = vi(t + 2);
+    let f = only;
+    if (!f) {
+      const key = col ? c.setRGB(col.getX(a), col.getY(a), col.getZ(a), THREE.LinearSRGBColorSpace).getHex() : -1;
+      f = memo.get(key);
+      if (f === undefined) memo.set(key, f = col ? finishOf(path, key) : 'nylon');
+    }
     if (!tris.has(f)) tris.set(f, []);
     tris.get(f).push(t);
+    if (nor) {
+      p0.fromBufferAttribute(pos, a); p1.fromBufferAttribute(pos, b).sub(p0); p2.fromBufferAttribute(pos, d).sub(p0);
+      sn.fromBufferAttribute(nor, a).add(p0.fromBufferAttribute(nor, b)).add(p0.fromBufferAttribute(nor, d));
+      if (p1.cross(p2).dot(sn) < 0) flip.add(t);
+    }
   }
-  // whole meshes pass through as-is, unless they hold interleaved (quantized) attributes: a split
-  // copy gets plain ones, and mergeGeometries refuses to mix the two kinds
+  // a split copy gets plain attributes, and mergeGeometries refuses to mix those with interleaved
+  // (quantized) ones, so meshes with interleaved attributes are always copied
   const interleaved = Object.values(geo.attributes).some((a) => a.isInterleavedBufferAttribute);
-  if (tris.size === 1 && !interleaved) return [[tris.keys().next().value, geo]];
+  if (tris.size === 1 && !interleaved && !flip.size) return [[tris.keys().next().value, geo]];
   return [...tris].map(([f, ts]) => {
     const remap = new Map(), index = [];
-    for (const t of ts) for (let k = 0; k < 3; k++) {
-      const v = idx ? idx.getX(t + k) : t + k;
+    for (const t of ts) for (const k of flip.has(t) ? [0, 2, 1] : [0, 1, 2]) {
+      const v = vi(t + k);
       if (!remap.has(v)) remap.set(v, remap.size);
       index.push(remap.get(v));
     }
@@ -451,7 +467,9 @@ function splitByFinish(geo, path) {
     return [f, g];
   });
 }
-function finishMaterial(f, opts = { vertexColors: true, side: THREE.DoubleSide }) {
+// solids: one-sided; the shadow pass then draws their back faces (three's default), which also
+// keeps acne off the lit side
+function finishMaterial(f, opts = { vertexColors: true }) {
   const { env, ...rest } = f;
   return new THREE.MeshPhysicalMaterial({ ...opts, ...rest,
     ...(env ? { envMap: scene.environment, envMapIntensity: env } : {}) });
@@ -724,18 +742,18 @@ function onModel(gltf) {
     const over = p.finish === 'gel' ? GEL : p.finish;
     for (const src of p.srcs) {
       if (p.paint) paintGel(src.geometry, p.paint);
-      for (const [key, geo] of over ? [['part', src.geometry]] : splitByFinish(src.geometry, pathOf(src))) {
+      for (const [key, geo] of splitByFinish(src.geometry, pathOf(src), over && 'part')) {
         if (!byFinish.has(key)) byFinish.set(key, { f: over || MAT[key], geos: [] });
         byFinish.get(key).geos.push(geo);
       }
     }
-    for (const { f, geos } of byFinish.values()) {
+    for (const [key, { f, geos }] of byFinish) {
       const geo = geos.length > 1 ? mergeGeometries(geos) : geos[0];
       const m = new THREE.Mesh(geo, finishMaterial(f));
       m.castShadow = true; m.receiveShadow = true;
       m.geometry.computeBoundingBox();
       box.union(m.geometry.boundingBox);
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 32),
+      const edges = new THREE.LineSegments(NO_EDGES.has(key) ? new THREE.BufferGeometry() : new THREE.EdgesGeometry(m.geometry, 32),
         new THREE.LineBasicMaterial({ color: 0x0d1015, transparent: true, opacity: 0.22 }));
       edges.raycast = () => {};
       edges.visible = !p.paint;  // no CAD outlines on the organic gel
@@ -1298,7 +1316,12 @@ addEventListener('resize', resize);
 resize();
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// While parts keep moving (servo demo, explode) the shadow map is redrawn every other frame: that
+// pass draws the whole model again, and a one-frame lag in the shadows is not visible. A pending
+// redraw always lands, so shadows settle exactly when the motion stops.
+let frame = 0, shadowFrame = -9;
 renderer.setAnimationLoop((time) => {
+  frame++;
   const k = reduce ? 1 : 0.14;
   const prevT = S.explodeShown;
   S.explodeShown += (S.explode - S.explodeShown) * k;
@@ -1323,7 +1346,7 @@ renderer.setAnimationLoop((time) => {
   controls.update();
   updateFlow(time);
   if (callouts.length) layoutCallouts();
-  if (S.shadowDirty) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; }
+  if (S.shadowDirty && frame - shadowFrame >= 2) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; shadowFrame = frame; }
   if (useGLGlass) {
     renderer.setRenderTarget(sceneRT);
     renderer.setClearColor(0x000000, 0);

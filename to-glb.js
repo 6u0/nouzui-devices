@@ -122,60 +122,90 @@ function pushVec3(arr, signed) {  // returns accessor fields for a VEC3 attribut
   if (!COMPACT) return { bufferView: push(arr, 34962), componentType: 5126 };
   return { bufferView: push(vec3x16(arr, signed), 34962, 8), componentType: signed ? 5122 : 5123, normalized: true };
 }
-const report = [];
-res.meshes.forEach((m, i) => {
-  let pos = new Float32Array(m.attributes.position.array);
-  const sh = shiftOf(i);
-  for (let k = 0; k < pos.length; k += 3) { pos[k] += sh[0]; pos[k + 1] += sh[1]; pos[k + 2] += sh[2] + lift; }
-  let nrm = m.attributes.normal ? new Float32Array(m.attributes.normal.array) : null;
-  let idx = new Uint32Array(m.index.array);
-  const smooth = m.brep_faces.length >= SMOOTH_MIN_FACES;
-  const s = match[i];
-  const base = m.color || [0.6, 0.6, 0.6];
-  if (smooth) ({ pos, nrm, idx } = weld(pos, idx));  // one colour for the whole body
-  const col = new Float32Array(pos.length);
-  const lin = toLinear(base);
-  for (let k = 0; k < col.length; k += 3) col.set(lin, k);
-  if (!smooth) m.brep_faces.forEach((f) => {
-    if (!f.color) return;
-    const l = toLinear(f.color);
-    for (let t = f.first; t <= f.last; t++) for (let v = 0; v < 3; v++) col.set(l, idx[t * 3 + v] * 3);
-  });
-  report.push(`${i} ${pathOf(i)} -> ${s ? s.id + ' ' + s.name : 'NONE'} ${base.map((v) => Math.round(v * 255)).join(',')}`);
-
+// "simplify": <mm> in to-glb.config.json drops triangles that change the surface by less than that
+// (meshoptimizer). Every CAD face keeps its exact outline (borders are locked), so colours, edges
+// and the fit between parts stay as they were: only the inside of finely tessellated faces thins out.
+const SIMPLIFY = CONFIG.simplify || 0;
+const { MeshoptSimplifier } = require('meshoptimizer');
+function simplify(pos, nrm, col, idx) {
   const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
   for (let k = 0; k < pos.length; k += 3) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], pos[k + a]); mx[a] = Math.max(mx[a], pos[k + a]); }
-  const attrs = {};
-  accessors.push({ bufferView: push(pos, 34962), componentType: 5126, count: pos.length / 3, type: 'VEC3', min: mn, max: mx });
-  attrs.POSITION = accessors.length - 1;
-  if (nrm) { accessors.push({ ...pushVec3(nrm, true), count: nrm.length / 3, type: 'VEC3' }); attrs.NORMAL = accessors.length - 1; }
-  accessors.push({ ...pushVec3(col, false), count: col.length / 3, type: 'VEC3' });
-  attrs.COLOR_0 = accessors.length - 1;
-  const small = COMPACT && pos.length / 3 <= 65536;
-  accessors.push({ bufferView: push(small ? Uint16Array.from(idx) : idx, 34963), componentType: small ? 5123 : 5125, count: idx.length, type: 'SCALAR' });
-  meshes.push({ name: 'm' + i, primitives: [{ attributes: attrs, indices: accessors.length - 1 }] });
-  // extras.c = original STEP base colour (picks a surface finish), extras.path = assembly path (picks the part)
-  nodes.push({ name: 'm' + i, mesh: i, extras: { c: key(base), path: pathOf(i) } });
-});
-fs.writeFileSync('match-report.txt', report.join('\n'));
+  const ext = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);  // the error is given relative to this
+  if (!ext) return { pos, nrm, col, idx };
+  const [out] = MeshoptSimplifier.simplify(idx, pos, 3, 0, SIMPLIFY / ext, ['LockBorder']);
+  if (out.length === idx.length) return { pos, nrm, col, idx };
+  // drop the vertices no triangle uses any more
+  const remap = new Int32Array(pos.length / 3).fill(-1);
+  let n = 0;
+  for (const v of out) if (remap[v] < 0) remap[v] = n++;
+  const pick = (src) => {
+    if (!src) return src;
+    const dst = new Float32Array(n * 3);
+    remap.forEach((d, v) => { if (d >= 0) dst.set(src.subarray(v * 3, v * 3 + 3), d * 3); });
+    return dst;
+  };
+  return { pos: pick(pos), nrm: pick(nrm), col: pick(col), idx: out.map((v) => remap[v]) };
+}
 
-const bin = Buffer.concat(bufs);
-const gltf = {
-  asset: { version: '2.0', generator: 'brain-device converter' },
-  scene: 0, scenes: [{ nodes: nodes.map((_, i) => i) }],
-  nodes, meshes, accessors, bufferViews, buffers: [{ byteLength: bin.length }],
-  ...(COMPACT ? { extensionsUsed: ['KHR_mesh_quantization'], extensionsRequired: ['KHR_mesh_quantization'] } : {}),
-};
-let json = Buffer.from(JSON.stringify(gltf));
-json = Buffer.concat([json, Buffer.alloc((4 - (json.length % 4)) % 4, 0x20)]);
-const header = Buffer.alloc(12);
-header.writeUInt32LE(0x46546c67, 0); header.writeUInt32LE(2, 4);
-header.writeUInt32LE(12 + 8 + json.length + 8 + bin.length, 8);
-const jh = Buffer.alloc(8); jh.writeUInt32LE(json.length, 0); jh.writeUInt32LE(0x4e4f534a, 4);
-const bh = Buffer.alloc(8); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x004e4942, 4);
-fs.mkdirSync('app', { recursive: true });
-fs.writeFileSync('app/model.glb', Buffer.concat([header, jh, json, bh, bin]));
-// Same GLB, base64-wrapped in JSON: the artifact host serves .json but not .glb
-const glb = fs.readFileSync('app/model.glb');
-fs.writeFileSync('app/model.json', JSON.stringify({ glb: glb.toString('base64') }));
-console.log('wrote app/model.glb + app/model.json', ((12 + 16 + json.length + bin.length) / 1e6).toFixed(2), 'MB');
+function build() {
+  const report = [];
+  res.meshes.forEach((m, i) => {
+    let pos = new Float32Array(m.attributes.position.array);
+    const sh = shiftOf(i);
+    for (let k = 0; k < pos.length; k += 3) { pos[k] += sh[0]; pos[k + 1] += sh[1]; pos[k + 2] += sh[2] + lift; }
+    let nrm = m.attributes.normal ? new Float32Array(m.attributes.normal.array) : null;
+    let idx = new Uint32Array(m.index.array);
+    const smooth = m.brep_faces.length >= SMOOTH_MIN_FACES;
+    const s = match[i];
+    const base = m.color || [0.6, 0.6, 0.6];
+    if (smooth) ({ pos, nrm, idx } = weld(pos, idx));  // one colour for the whole body
+    let col = new Float32Array(pos.length);
+    const lin = toLinear(base);
+    for (let k = 0; k < col.length; k += 3) col.set(lin, k);
+    if (!smooth) m.brep_faces.forEach((f) => {
+      if (!f.color) return;
+      const l = toLinear(f.color);
+      for (let t = f.first; t <= f.last; t++) for (let v = 0; v < 3; v++) col.set(l, idx[t * 3 + v] * 3);
+    });
+    if (SIMPLIFY && !smooth) ({ pos, nrm, col, idx } = simplify(pos, nrm, col, idx));
+    report.push(`${i} ${pathOf(i)} -> ${s ? s.id + ' ' + s.name : 'NONE'} ${base.map((v) => Math.round(v * 255)).join(',')}`);
+
+    const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    for (let k = 0; k < pos.length; k += 3) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], pos[k + a]); mx[a] = Math.max(mx[a], pos[k + a]); }
+    const attrs = {};
+    accessors.push({ bufferView: push(pos, 34962), componentType: 5126, count: pos.length / 3, type: 'VEC3', min: mn, max: mx });
+    attrs.POSITION = accessors.length - 1;
+    if (nrm) { accessors.push({ ...pushVec3(nrm, true), count: nrm.length / 3, type: 'VEC3' }); attrs.NORMAL = accessors.length - 1; }
+    accessors.push({ ...pushVec3(col, false), count: col.length / 3, type: 'VEC3' });
+    attrs.COLOR_0 = accessors.length - 1;
+    const small = COMPACT && pos.length / 3 <= 65536;
+    accessors.push({ bufferView: push(small ? Uint16Array.from(idx) : idx, 34963), componentType: small ? 5123 : 5125, count: idx.length, type: 'SCALAR' });
+    meshes.push({ name: 'm' + i, primitives: [{ attributes: attrs, indices: accessors.length - 1 }] });
+    // extras.c = original STEP base colour (picks a surface finish), extras.path = assembly path (picks the part)
+    nodes.push({ name: 'm' + i, mesh: i, extras: { c: key(base), path: pathOf(i) } });
+  });
+  fs.writeFileSync('match-report.txt', report.join('\n'));
+
+  const bin = Buffer.concat(bufs);
+  const gltf = {
+    asset: { version: '2.0', generator: 'brain-device converter' },
+    scene: 0, scenes: [{ nodes: nodes.map((_, i) => i) }],
+    nodes, meshes, accessors, bufferViews, buffers: [{ byteLength: bin.length }],
+    ...(COMPACT ? { extensionsUsed: ['KHR_mesh_quantization'], extensionsRequired: ['KHR_mesh_quantization'] } : {}),
+  };
+  let json = Buffer.from(JSON.stringify(gltf));
+  json = Buffer.concat([json, Buffer.alloc((4 - (json.length % 4)) % 4, 0x20)]);
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0); header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(12 + 8 + json.length + 8 + bin.length, 8);
+  const jh = Buffer.alloc(8); jh.writeUInt32LE(json.length, 0); jh.writeUInt32LE(0x4e4f534a, 4);
+  const bh = Buffer.alloc(8); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x004e4942, 4);
+  fs.mkdirSync('app', { recursive: true });
+  fs.writeFileSync('app/model.glb', Buffer.concat([header, jh, json, bh, bin]));
+  // Same GLB, base64-wrapped in JSON: the artifact host serves .json but not .glb
+  const glb = fs.readFileSync('app/model.glb');
+  fs.writeFileSync('app/model.json', JSON.stringify({ glb: glb.toString('base64') }));
+  console.log('wrote app/model.glb + app/model.json', ((12 + 16 + json.length + bin.length) / 1e6).toFixed(2), 'MB');
+}
+if (SIMPLIFY) MeshoptSimplifier.ready.then(build);
+else build();

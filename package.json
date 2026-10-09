@@ -10,6 +10,7 @@
     "headgear:convert": "cd headgear && python ../step-mesh.py \"source/metaq brain.step\" && node ../step-colors.js \"source/metaq brain.step\" && node ../to-glb.js"
   },
   "dependencies": {
+    "meshoptimizer": "0.21.0",
     "occt-import-js": "^0.0.23"
   }
 }
