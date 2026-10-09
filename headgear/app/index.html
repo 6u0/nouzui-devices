@@ -978,7 +978,7 @@ function updateServos(now, dt) {
     s.pivot.quaternion.setFromAxisAngle(s.axis, THREE.MathUtils.degToRad(s.angle) * (SERVO_REV[s.i] ? -1 : 1));
     moved = true;
   }
-  if (moved) S.shadowDirty = true;
+  if (moved) S.hornsMoved = true;  // shadows: see hornShadow
 }
 
 // ---------- Explode ----------
@@ -1537,6 +1537,67 @@ function updateGlassRects() {
   u.uCount.value = n;
 }
 
+// ---------- Shadows while only the horns turn ----------
+// The demos (圧力 above all) turn servo horns every frame. Redrawing the whole shadow map for that
+// (~190k triangles) made those steps stutter on iPad. So the map is kept in two layers: everything
+// but the horns is drawn into a cache whenever the full map is redrawn anyway (explode, ghosting),
+// and while only horns move, each frame copies the cache into the map and draws just the horns
+// (a few thousand triangles) over it. A horn fragment behind the cached depth is dropped, so the
+// map comes out the same as a full redraw.
+const hornShadow = (() => {
+  const SIZE = key.shadow.mapSize.x;
+  const cache = new THREE.WebGLRenderTarget(SIZE, SIZE, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  // what three's shadow pass draws: RGBA-packed depth, back faces of one-sided solids
+  const staticMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.BackSide });
+  const hornMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.BackSide });
+  const uniforms = { uStatic: { value: cache.texture }, uSize: { value: new THREE.Vector2(SIZE, SIZE) } };
+  hornMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.fragmentShader = 'uniform sampler2D uStatic; uniform vec2 uSize;\n' + sh.fragmentShader.replace('gl_FragColor = packDepthToRGBA( fragCoordZ );',
+      'if ( unpackRGBAToDepth( texture2D( uStatic, gl_FragCoord.xy / uSize ) ) < fragCoordZ ) discard;\n\t\tgl_FragColor = packDepthToRGBA( fragCoordZ );');
+  };
+  const copy = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: cache.texture } }, depthTest: false, depthWrite: false,
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: 'uniform sampler2D uTex; varying vec2 vUv; void main() { gl_FragColor = texture2D(uTex, vUv); }',
+  }));
+  copy.frustumCulled = false;
+  const copyScene = new THREE.Scene().add(copy), copyCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  let ready = false;
+  const horns = () => new Set(servos.flatMap((s) => s.pivot.children.filter((o) => o.isMesh)));
+  // draw only the meshes `keep` accepts (shadow casters), the rest hidden for the pass
+  function pass(target, material, keep, clear) {
+    const hidden = [];
+    scene.traverseVisible((o) => { if ((o.isMesh || o.isLine || o.isPoints) && !keep(o)) hidden.push(o); });
+    hidden.forEach((o) => { o.visible = false; });
+    const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
+    const ac = renderer.autoClear;
+    renderer.autoClear = false;  // the horn pass draws over the copied cache
+    scene.overrideMaterial = material;
+    renderer.setRenderTarget(target);
+    if (clear) { renderer.setClearColor(0xffffff, 1); renderer.clear(); } else renderer.clearDepth();
+    renderer.render(scene, key.shadow.camera);
+    scene.overrideMaterial = null;
+    renderer.autoClear = ac;
+    renderer.setClearColor(cc, ca);
+    hidden.forEach((o) => { o.visible = true; });
+  }
+  return {
+    // the full map was just redrawn (or will be this frame): the cache is out of date
+    stale() { ready = false; },
+    draw() {
+      if (!key.shadow.map) return false;  // no full pass yet
+      const h = horns();
+      if (!ready) { pass(cache, staticMat, (o) => o.isMesh && o.castShadow && !h.has(o), true); ready = true; }
+      renderer.setRenderTarget(key.shadow.map);
+      renderer.render(copyScene, copyCam);  // covers every texel, so the auto-clear before it is harmless
+      pass(key.shadow.map, hornMat, (o) => h.has(o) && o.castShadow, false);
+      renderer.setRenderTarget(null);
+      return true;
+    },
+  };
+})();
+
 // ---------- Loop ----------
 // ---------- Framing: keep the model clear of the tour card ----------
 // In the tour the card covers part of the screen (left column on wide screens, bottom sheet on
@@ -1629,7 +1690,13 @@ renderer.setAnimationLoop((time) => {
   updateFrame();
   updateFlow(time);
   if (callouts.length) layoutCallouts();
-  if (S.shadowDirty && frame - shadowFrame >= 2) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; shadowFrame = frame; }
+  if (S.shadowDirty && frame - shadowFrame >= 2) {
+    renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; shadowFrame = frame;
+    hornShadow.stale(); S.hornsMoved = false;  // the full pass draws the horns too
+  } else if (S.hornsMoved && !S.shadowDirty) {
+    S.hornsMoved = false;
+    if (!hornShadow.draw()) S.shadowDirty = true;
+  }
   if (useGLGlass) {
     renderer.setRenderTarget(sceneRT);
     renderer.setClearColor(0x000000, 0);
