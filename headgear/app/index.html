@@ -1534,9 +1534,49 @@ function updateGlassRects() {
 }
 
 // ---------- Loop ----------
+// ---------- Framing: keep the model clear of the tour card ----------
+// In the tour the card covers part of the screen (left column on wide screens, bottom sheet on
+// narrow ones). The picture is then slid to the middle of the free area and scaled to fit it:
+// setViewOffset moves the projection centre, camera.zoom shrinks the image. The orbit target, the
+// distance and whatever the user has turned or zoomed stay as they are; raycasts and the leader
+// labels use the same projection, so they follow. Eases in and out like the other view moves.
+const shift = { x: 0, y: 0, k: 1 }, shiftGoal = { x: 0, y: 0, k: 1 };
+const railEl = document.querySelector('.rail'), titleEl = document.querySelector('.titleblock');
+function shiftTarget() {
+  shiftGoal.x = 0; shiftGoal.y = 0; shiftGoal.k = 1;
+  if (S.mode !== 'tour' || tourEl.hidden) return;
+  const W = innerWidth, H = innerHeight, c = tourEl.getBoundingClientRect();
+  let L = 0, R = W, T = titleEl.getBoundingClientRect().bottom + 8, B = H;
+  if (c.width < W * 0.6) L = c.right + 12;   // card in a column on the left
+  else B = c.top - 12;                       // card along the bottom
+  const r = railEl.getBoundingClientRect();
+  if (r.width && r.left > W / 2) R = Math.min(R, r.left - 8);
+  if (R - L < 120 || B - T < 120) return;
+  shiftGoal.x = (L + R) / 2 - W / 2;
+  shiftGoal.y = (T + B) / 2 - H / 2;
+  // the model fills roughly the middle 70 % at home, so shrink only as far as the free area needs
+  shiftGoal.k = Math.min(1, Math.max(0.6, Math.min((R - L) / W, (B - T) / H) / 0.7));
+}
+function applyFrame() {
+  if (Math.abs(shift.x) < 0.5 && Math.abs(shift.y) < 0.5 && Math.abs(shift.k - 1) < 1e-3) camera.clearViewOffset();
+  else camera.setViewOffset(innerWidth, innerHeight, -shift.x, -shift.y, innerWidth, innerHeight);
+  camera.zoom = shift.k;
+  camera.updateProjectionMatrix();
+}
+function updateFrame() {
+  shiftTarget();
+  const d = Math.abs(shiftGoal.x - shift.x) + Math.abs(shiftGoal.y - shift.y) + Math.abs(shiftGoal.k - shift.k) * 400;
+  if (d < 0.05) return;
+  const k = reduceShift ? 1 : 0.12;
+  shift.x += (shiftGoal.x - shift.x) * k; shift.y += (shiftGoal.y - shift.y) * k; shift.k += (shiftGoal.k - shift.k) * k;
+  if (d < 0.5) Object.assign(shift, shiftGoal);
+  applyFrame();
+}
+const reduceShift = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function resize() {
   camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
+  applyFrame();  // also refreshes the projection (the view offset is in screen px)
   renderer.setSize(innerWidth, innerHeight);
   const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
   sceneRT.setSize(buf.x, buf.y);
@@ -1582,6 +1622,7 @@ renderer.setAnimationLoop((time) => {
     if (camera.position.distanceTo(fly.pos) < 0.5 || performance.now() > fly.until) fly = null;
   }
   controls.update();
+  updateFrame();
   updateFlow(time);
   if (callouts.length) layoutCallouts();
   if (S.shadowDirty && frame - shadowFrame >= 2) { renderer.shadowMap.needsUpdate = true; S.shadowDirty = false; shadowFrame = frame; }
