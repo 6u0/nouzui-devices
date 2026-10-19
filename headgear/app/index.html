@@ -58,7 +58,11 @@ body {
    panels still scroll. The 3D canvas, the sliders and the body itself keep touch-action: none. */
 body * { touch-action: pan-x pan-y; }
 button { font-family: inherit; color: inherit; letter-spacing: inherit; }
-#stage { position: fixed; inset: 0; }
+/* With the transparent status bar (installed app) iOS lays the page out from the top of the screen
+   but reports a viewport short by the status bar, which left a bare strip at the bottom. The 3D
+   stage is made that much taller so it reaches the bottom edge; elsewhere the inset is 0. */
+html { background: var(--bg-bottom); }
+#stage { position: fixed; left: 0; top: 0; width: 100%; height: calc(100% + env(safe-area-inset-top, 0px)); }
 #stage canvas { display: block; width: 100%; height: 100%; }
 
 /* ---- Liquid Glass material ---- */
@@ -608,9 +612,13 @@ const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
 
 // ---------- Renderer / scene ----------
 const stage = document.getElementById('stage');
+// size of the 3D stage in CSS px: the whole screen, which can be taller than innerHeight (see #stage)
+let VW = innerWidth, VH = innerHeight;
+const measureStage = () => { VW = stage.clientWidth || innerWidth; VH = stage.clientHeight || innerHeight; };
+measureStage();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(VW, VH);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.9;
 renderer.shadowMap.enabled = true;
@@ -625,7 +633,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.55;
 
-const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 1, 6000);
+const camera = new THREE.PerspectiveCamera(32, VW / VH, 1, 6000);
 const HOME = { pos: new THREE.Vector3(470, 400, 560), target: new THREE.Vector3(0, 110, 0) };
 camera.position.copy(HOME.pos);
 
@@ -1121,7 +1129,7 @@ function renderCalloutText() {
   for (const { part: p, el } of callouts) el.innerHTML = `<span class="ref">${p.ref}</span><b>${P(p, 'name')}</b><small>${P(p, 'sub') || p.en}</small>`;
 }
 const _p = new THREE.Vector3();
-function toScreen(v) { _p.copy(v).project(camera); return { x: (_p.x + 1) / 2 * innerWidth, y: (1 - _p.y) / 2 * innerHeight, z: _p.z }; }
+function toScreen(v) { _p.copy(v).project(camera); return { x: (_p.x + 1) / 2 * VW, y: (1 - _p.y) / 2 * VH, z: _p.z }; }
 function modelScreenBounds() {
   let minX = Infinity, maxX = -Infinity;
   for (const p of PARTS) {
@@ -1205,7 +1213,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
   down = null;
   if (moved > 8 || dt > 500) return;
-  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ndc.set(e.clientX / VW * 2 - 1, -(e.clientY / VH) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hits = ray.intersectObjects([...meshParts.keys()], false).filter((h) => h.object.material.opacity > 0.5 && h.object.parent.visible);
   select(hits.length ? meshParts.get(hits[0].object) : null);
@@ -1530,7 +1538,7 @@ if (useGLGlass) document.body.classList.add('gl-glass');
 
 // read every visible .glass element's rect (device px, y up) into the shader uniforms
 function updateGlassRects() {
-  const dpr = renderer.getPixelRatio(), H = innerHeight, u = glassMat.uniforms;
+  const dpr = renderer.getPixelRatio(), H = VH, u = glassMat.uniforms;
   let n = 0;
   for (const el of document.querySelectorAll('.glass')) {
     if (n >= GLASS_MAX || !el.getClientRects().length) continue;
@@ -1618,7 +1626,7 @@ const railEl = document.querySelector('.rail'), titleEl = document.querySelector
 function shiftTarget() {
   shiftGoal.x = 0; shiftGoal.y = 0; shiftGoal.k = 1;
   if (S.mode !== 'tour' || tourEl.hidden) return;
-  const W = innerWidth, H = innerHeight, c = tourEl.getBoundingClientRect();
+  const W = VW, H = VH, c = tourEl.getBoundingClientRect();
   let L = 0, R = W, T = titleEl.getBoundingClientRect().bottom + 8, B = H;
   if (c.width < W * 0.6) L = c.right + 12;   // card in a column on the left
   else B = c.top - 12;                       // card along the bottom
@@ -1632,7 +1640,7 @@ function shiftTarget() {
 }
 function applyFrame() {
   if (Math.abs(shift.x) < 0.5 && Math.abs(shift.y) < 0.5 && Math.abs(shift.k - 1) < 1e-3) camera.clearViewOffset();
-  else camera.setViewOffset(innerWidth, innerHeight, -shift.x, -shift.y, innerWidth, innerHeight);
+  else camera.setViewOffset(VW, VH, -shift.x, -shift.y, VW, VH);
   camera.zoom = shift.k;
   camera.updateProjectionMatrix();
 }
@@ -1648,17 +1656,18 @@ function updateFrame() {
 const reduceShift = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function resize() {
-  camera.aspect = innerWidth / innerHeight;
+  measureStage();
+  camera.aspect = VW / VH;
   applyFrame();  // also refreshes the projection (the view offset is in screen px)
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(VW, VH);
   const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
   sceneRT.setSize(buf.x, buf.y);
   smallRT.setSize(Math.ceil(buf.x / 4), Math.ceil(buf.y / 4));
   downMat.uniforms.uTexel.value.set(1 / buf.x, 1 / buf.y);
   glassMat.uniforms.uRes.value.copy(buf);
   glassMat.uniforms.uDpr.value = renderer.getPixelRatio();
-  svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
-  svg.setAttribute('width', innerWidth); svg.setAttribute('height', innerHeight);
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+  svg.setAttribute('width', VW); svg.setAttribute('height', VH);
 }
 addEventListener('resize', resize);
 resize();
