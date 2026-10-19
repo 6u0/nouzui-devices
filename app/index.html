@@ -58,11 +58,14 @@ body {
    panels still scroll. The 3D canvas, the sliders and the body itself keep touch-action: none. */
 body * { touch-action: pan-x pan-y; }
 button { font-family: inherit; color: inherit; letter-spacing: inherit; }
-/* With the transparent status bar (installed app) iOS lays the page out from the top of the screen
-   but reports a viewport short by the status bar, which left a bare strip at the bottom. The 3D
-   stage is made that much taller so it reaches the bottom edge; elsewhere the inset is 0. */
+/* The page is one box, body, and everything is placed inside it (position: absolute), so the
+   whole layout follows its size. Normally that is the viewport. In the installed app with the
+   transparent status bar, iOS draws from the top of the screen but reports a viewport shorter than
+   the screen (32pt on the iPad it was measured on): the 3D view stopped short of the bottom edge and
+   the bottom controls sat too high. fitScreen() then sets --app-h to the real screen height. */
 html { background: var(--bg-bottom); }
-#stage { position: fixed; left: 0; top: 0; width: 100%; height: calc(100% + env(safe-area-inset-top, 0px)); }
+body { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); }
+#stage { position: absolute; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; }
 
 /* ---- Liquid Glass material ---- */
@@ -86,10 +89,10 @@ body.gl-glass .glass.lit::before { display: none; }
   .glass { background: #f9f9fb; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-#leaders { position: fixed; inset: 0; pointer-events: none; overflow: visible; }
+#leaders { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 #leaders path { fill: none; stroke: rgba(60, 60, 67, 0.55); stroke-width: 1; }
 #leaders circle { fill: #ffffff; stroke: var(--accent); stroke-width: 2.5; }
-#labels { position: fixed; inset: 0; pointer-events: none; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
 .callout {
   position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
   display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: baseline;
@@ -102,7 +105,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* Large Title, left-aligned, straight on the content like a navigation title */
 .titleblock {
-  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); left: 24px;
+  position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 24px;
   display: grid; gap: 2px; pointer-events: none;
 }
 .titleblock .eyebrow { font-size: 13px; font-weight: 600; color: var(--label-2); letter-spacing: 0; text-transform: uppercase; }
@@ -114,7 +117,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* capsule segmented control */
 .modes {
-  position: fixed; top: calc(18px + env(safe-area-inset-top, 0px)); right: 18px;
+  position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); right: 18px;
   display: flex; gap: 2px; padding: 3px; border-radius: 999px;
 }
 .modes button {
@@ -128,7 +131,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* vertical capsule slider; the thumb turns to clear glass while dragging */
 .rail {
-  position: fixed; right: 18px; top: 50%; transform: translateY(-44%);
+  position: absolute; right: 18px; top: 50%; transform: translateY(-44%);
   width: 64px; height: min(52vh, 420px); display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
   justify-items: center; padding: 14px 0; border-radius: 32px;
 }
@@ -155,7 +158,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* one grouped toolbar, text buttons only */
 .tools {
-  position: fixed; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  position: absolute; left: 18px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; max-width: calc(100vw - 120px);
 }
 .chip {
@@ -172,7 +175,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* glass card */
 .sheet {
-  position: fixed; right: 100px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  position: absolute; right: 100px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   width: min(370px, calc(100vw - 136px)); padding: 18px 18px 10px; border-radius: var(--r-panel);
   display: grid; gap: 6px;
 }
@@ -194,7 +197,7 @@ body.gl-glass .glass.lit::before { display: none; }
 
 /* how-it-works panel: a sidebar-style list + text */
 .tour {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   width: min(640px, calc(100vw - 36px)); padding: 8px 8px 12px; border-radius: var(--r-panel); display: grid; gap: 8px;
 }
 .steps { display: flex; gap: 2px; overflow-x: auto; }
@@ -216,7 +219,7 @@ body.gl-glass .glass.lit::before { display: none; }
 .tour .nav button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--fill); }
 .tour .nav #tour-next { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
 
-.loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--label-2); pointer-events: none; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--label-2); pointer-events: none; }
 
 body.touring .tools, body.touring .sheet { display: none; }
 @media (min-width: 900px) {
@@ -668,9 +671,20 @@ const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
 
 // ---------- Renderer / scene ----------
 const stage = document.getElementById('stage');
-// size of the 3D stage in CSS px: the whole screen, which can be taller than innerHeight (see #stage)
+// size of the 3D stage in CSS px = the layout box (body), which can be taller than innerHeight
 let VW = innerWidth, VH = innerHeight;
 const measureStage = () => { VW = stage.clientWidth || innerWidth; VH = stage.clientHeight || innerHeight; };
+// Installed app filling the screen (home-screen PWA on iPad / iPhone): size the layout box to the
+// screen itself, since iOS reports a shorter viewport there (see body in the CSS). A browser tab
+// or a Stage Manager / Split View window keeps the viewport.
+function fitScreen() {
+  const app = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
+  const sw = innerWidth > innerHeight ? long : short, sh = innerWidth > innerHeight ? short : long;
+  const full = app && Math.abs(innerWidth - sw) <= 1 && sh > innerHeight;
+  document.documentElement.style.setProperty('--app-h', full ? sh + 'px' : '100%');
+}
+fitScreen();
 measureStage();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -985,7 +999,7 @@ function layoutCallouts() {
   // keep left-hand labels clear of the tour card when it sits on the left
   const tourBox = !tourEl.hidden ? tourEl.getBoundingClientRect() : null;
   const margin = tourBox && tourBox.left < 40 ? tourBox.right + 16 : 16, gapX = 36, minGap = 58;
-  const top = 110, bottom = innerHeight - 90;
+  const top = 110, bottom = VH - 90;
   for (const side of ['left', 'right']) {
     const list = sides[side].sort((a, b) => a.a.y - b.a.y);
     let lastY = -Infinity;
@@ -995,7 +1009,7 @@ function layoutCallouts() {
       if (y < lastY + minGap) y = lastY + minGap;
       lastY = y;
       let x = side === 'left' ? Math.min(bounds.minX - gapX - w, it.a.x - 60 - w) : Math.max(bounds.maxX + gapX, it.a.x + 60);
-      x = side === 'left' ? Math.max(margin, Math.min(innerWidth - w - 96, x)) : Math.max(16, Math.min(innerWidth - w - 96, x));
+      x = side === 'left' ? Math.max(margin, Math.min(VW - w - 96, x)) : Math.max(16, Math.min(VW - w - 96, x));
       it.c.el.style.transform = `translate(${x}px, ${y}px)`;
       const ey = y + h / 2, ex = side === 'left' ? x + w : x;
       const knee = side === 'left' ? ex + 18 : ex - 18;
@@ -1363,6 +1377,7 @@ function updateFrame() {
 const reduceShift = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function resize() {
+  fitScreen();
   measureStage();
   camera.aspect = VW / VH;
   applyFrame();  // also refreshes the projection (the view offset is in screen px)
