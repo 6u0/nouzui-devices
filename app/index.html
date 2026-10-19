@@ -1,5 +1,6 @@
 <title>Brain Device Inside</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <!-- the manifest scope is this folder, which also holds headgear/ (whose manifest scope is "../"):
      moving between the two pages stays inside the installed app (PWA) wherever it is served -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -49,6 +50,10 @@ body {
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
   touch-action: none;
 }
+/* No page zoom at all: a double tap or pinch on a panel zoomed the page, and under Guided Access
+   (kiosk use) there is no way back. touch-action does not inherit, so it goes on every element;
+   panels still scroll. The 3D canvas, the sliders and the body itself keep touch-action: none. */
+body * { touch-action: pan-x pan-y; }
 button { font-family: inherit; color: inherit; letter-spacing: inherit; }
 #stage { position: fixed; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; }
@@ -1409,6 +1414,10 @@ renderer.setAnimationLoop((time) => {
     renderer.render(scene, camera);
   }
 });
+
+// Safari's own pinch gesture (it can zoom the page past user-scalable=no); the 3D view's pinch
+// runs on pointer events and is not affected
+document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
