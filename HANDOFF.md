@@ -187,6 +187,7 @@ WebGL2が使えない環境や、「透明度を下げる」がONの環境では
   - 名称は「M5StickS3」（CAD形状はM5StickC Plusのまま）。
   - M5本体の色は `#3F4551`。
   - 脳と底面カバーは超軟質ウレタンゲル製。実物どおり、深い赤の塗装・濡れたツヤで見せる（カバーも脳と同じ色）。
+- **ホーム画面アプリでは時計などの帯を透明に**（`apple-mobile-web-app-status-bar-style: black-translucent`）。背景が画面の一番上まで続く。iOS の仕様で時計・電池などの表示は白になる。見出しやボタンは `safe-area-inset-top` で帯を避けている。
 - **ページの拡大はさせない**：アクセスガイド（展示用）中にダブルタップで拡大されると戻せなくなるため。全要素に `touch-action: pan-x pan-y`（スクロールは可）、viewport に `user-scalable=no`、Safari のピンチ（`gesturestart`）を止める。3D の拡大縮小はそのまま使える。
 - **言語**：日本語 / 繁體中文（台湾）の切り替え。
 - **UIの変遷**
