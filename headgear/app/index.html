@@ -112,8 +112,6 @@ body.gl-glass .glass.lit::before { display: none; }
 .titleblock .eyebrow { font-size: 13px; font-weight: 600; color: var(--label-2); letter-spacing: 0; text-transform: uppercase; }
 .titleblock h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -0.02em; }
 .titleblock .eyebrow-row { display: flex; align-items: center; gap: 10px; }
-.titleblock .sibling { pointer-events: auto; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; background: color-mix(in srgb, var(--accent) 11%, transparent); }
-.titleblock .sibling:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
 .titleblock .dims { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
 /* capsule segmented control */
@@ -262,7 +260,7 @@ body.touring .tools, body.touring .sheet { display: none; }
 <div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
 
 <header class="titleblock">
-  <div class="eyebrow-row"><span class="eyebrow">Headgear · v3.4</span><a class="sibling" href="../" data-local="../ ../../app/" data-artifact="https://claude.ai/artifact/WoLULHZCEYWqHDiaMPRuN3" data-i18n="sibling">脳デバイスへ →</a></div>
+  <div class="eyebrow-row"><span class="eyebrow">Headgear · v3.4</span></div>
   <h1 data-i18n="title">ヘッドギアの中身</h1>
   <span class="dims">171.7 × 297.6 × 235.2 mm · 1244 solids</span>
 </header>
@@ -273,8 +271,8 @@ body.touring .tools, body.touring .sheet { display: none; }
 </nav>
 
 <nav class="modes langs glass" aria-label="言語 / 語言">
-  <button id="lang-ja" aria-pressed="true" lang="ja">日本語</button>
-  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
+  <button id="lang-ja" aria-pressed="false" lang="ja">日本語</button>
+  <button id="lang-zh" aria-pressed="true" lang="zh-Hant">繁中</button>
 </nav>
 
 <div class="rail glass lit">
@@ -525,7 +523,7 @@ const UI = {
     prev: '← 前へ', next: '次へ →',
     stage: 'ヘッドギアの3Dモデル。ドラッグで回転、ピンチで拡大', modes: '表示モード', track: '高さ方向の分解量', close: '閉じる',
     demoPower: '/power を送ってみる（0〜100）', demoAuto: '自動', demoPowerNote: '数字は「送った値 → サーボの角度」。40°で頭打ちになります。',
-    demoUnlock: '/unlock 1 を送る', demoMirrorOpen: '/mirror 1（170°へ）', demoMirrorClose: '/mirror 0（0°へ）', demoAngle: 'いまの角度', sibling: '脳デバイスへ →',
+    demoUnlock: '/unlock 1 を送る', demoMirrorOpen: '/mirror 1（170°へ）', demoMirrorClose: '/mirror 0（0°へ）', demoAngle: 'いまの角度',
   },
   zh: {
     title: '頭戴裝置的內部', loading: '模型載入中…', loadFail: '無法載入模型，請重新整理頁面。',
@@ -533,7 +531,7 @@ const UI = {
     prev: '← 上一步', next: '下一步 →',
     stage: '頭戴裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉',
     demoPower: '試著傳送 /power（0〜100）', demoAuto: '自動', demoPowerNote: '數字是「傳送的值 → 伺服馬達角度」，到 40° 封頂。',
-    demoUnlock: '傳送 /unlock 1', demoMirrorOpen: '/mirror 1（轉到 170°）', demoMirrorClose: '/mirror 0（回到 0°）', demoAngle: '目前角度', sibling: '前往腦裝置 →',
+    demoUnlock: '傳送 /unlock 1', demoMirrorOpen: '/mirror 1（轉到 170°）', demoMirrorClose: '/mirror 0（回到 0°）', demoAngle: '目前角度',
   },
 };
 const ZH_PARTS = {
@@ -584,35 +582,13 @@ const ZH_TOUR = [
   { tab: '鏡子', title: '輸出：鏡子', flow: '/mirror 1 → 170°（2 秒）／ /mirror 0 → 0°（2 秒）',
     text: '在階段 6 收到 /mirror 1 時，前方的 SG90（伺服 #7）會花 2 秒轉到 170°。在階段 7 收到 /mirror 0 時，同樣花 2 秒回到 0°。角度每 20ms 更新一點，所以動作平順。' },
 ];
-let LANG = 'ja';
-try {
-  const saved = localStorage.getItem('bd-lang');
-  LANG = saved === 'zh' || saved === 'ja' ? saved : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ja';
-} catch (e) { /* storage blocked: keep default */ }
+// 繁體中文 first. Every visit opens in it and the idle reset returns to it, so one visitor's
+// choice does not carry over to the next (nothing is stored).
+let LANG = 'zh';
 const ui = (k) => UI[LANG][k];
 const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
 const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
 
-
-// Sibling page link: the other artifact when this page is shown on Claude; otherwise the other page
-// next to this one, wherever it is served from. data-local lists the relative candidates —
-// npm run serve and dist/ give / ⇄ /headgear/, a server rooted at the project folder (e.g. VS Code
-// Live Server) gives /app/ ⇄ /headgear/app/ — and the first one whose model.json exists wins.
-{
-  const onClaude = /claude/i.test(location.hostname) || [...(location.ancestorOrigins || [])].some((o) => /claude/i.test(o));
-  for (const a of document.querySelectorAll('.sibling')) {
-    // installed as an app (home screen / PWA): never open a new tab, it would leave the app
-    const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
-    if (onClaude) { a.href = a.dataset.artifact; if (!standalone) { a.target = '_blank'; a.rel = 'noopener'; } continue; }
-    const tries = a.dataset.local.split(' ');
-    a.href = tries[0];
-    (async () => {
-      for (const t of tries) {
-        try { if ((await fetch(new URL(t + 'model.json', location.href), { method: 'HEAD', cache: 'no-store' })).ok) { a.href = t; return; } } catch (e) { /* try the next one */ }
-      }
-    })();
-  }
-}
 
 // ---------- Renderer / scene ----------
 const stage = document.getElementById('stage');
@@ -1330,7 +1306,6 @@ function goStep(i) {
 // Language switch: re-renders every text in place (keeps view, step and explode as they are)
 function setLang(l) {
   LANG = l;
-  try { localStorage.setItem('bd-lang', l); } catch (e) { /* storage blocked: choice lasts this visit */ }
   document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
   document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
   document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
@@ -1743,6 +1718,26 @@ renderer.setAnimationLoop((time) => {
     renderer.render(scene, camera);
   }
 });
+
+// ---------- Back to the start after 5 minutes untouched ----------
+// For a device left out on show (Guided Access): with no touch, wheel or key for IDLE_MS the page
+// returns to how it opens: 観察, 繁體中文, assembled, shell solid, auto-rotate on, the home view,
+// no part sheet open.
+const IDLE_MS = 5 * 60 * 1000;
+let idleTimer = 0;
+function backToStart() {
+  if (S.mode !== 'explore') setMode('explore');
+  select(null);
+  if (LANG !== 'zh') setLang('zh');
+  const ghost = document.getElementById('t-ghost'), spin = document.getElementById('t-spin');
+  if (ghost.getAttribute('aria-pressed') === 'true') ghost.click();
+  if (spin.getAttribute('aria-pressed') !== 'true') spin.click();
+  setExplode(0);
+  flyHome(0);
+}
+function stillHere() { clearTimeout(idleTimer); idleTimer = setTimeout(backToStart, IDLE_MS); }
+for (const ev of ['pointerdown', 'wheel', 'keydown']) addEventListener(ev, stillHere, { capture: true, passive: true });
+stillHere();
 
 // Safari's own pinch gesture (it can zoom the page past user-scalable=no); the 3D view's pinch
 // runs on pointer events and is not affected

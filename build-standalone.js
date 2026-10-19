@@ -14,7 +14,7 @@ const lead = page.match(/^(?:\s*(?:<title>[^<]*<\/title>|<meta\b[^>]*>|<link\b[^
 const headTags = lead ? lead[0].trim() + '\n' : '';
 const body = lead ? page.slice(lead[0].length).replace(/^\s+/, '') : page;
 const head = `<!doctype html>
-<html lang="ja">
+<html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
