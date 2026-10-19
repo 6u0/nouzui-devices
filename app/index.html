@@ -64,7 +64,7 @@ button { font-family: inherit; color: inherit; letter-spacing: inherit; }
    transparent status bar, iOS puts fixed content below the status bar but makes it a status bar
    too short, so it stopped short of the bottom edge; fitScreen() then sets --app-h (see there).
    Behind the status bar only the html background shows: the same backdrop, so it runs on unbroken. */
-html { background: var(--backdrop); }
+html { background: var(--backdrop); background-color: var(--bg-bottom); }  /* the colour also fills any area iOS leaves outside the page */
 body { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); }
 #stage { position: absolute; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; }
@@ -652,13 +652,14 @@ const stage = document.getElementById('stage');
 let VW = innerWidth, VH = innerHeight;
 const measureStage = () => { VW = stage.clientWidth || innerWidth; VH = stage.clientHeight || innerHeight; };
 // Installed app (home-screen PWA) with the transparent status bar. Measured on an iPad Air 11"
-// (two screenshots): screen 1180pt, status bar 32pt, page (html) 1148pt from the top of the screen,
-// but fixed content runs from 32pt and only 1116pt tall, one status bar short of the bottom edge.
-// The page height is the right height for the area below the status bar, so the box takes it. In a
-// browser tab or a Stage Manager / Split View window the two are the same and nothing changes.
+// (three screenshots): screen 1180pt, status bar 32pt. Fixed content starts below the status bar
+// but its area (and documentElement.clientHeight) is only 1116pt, one status bar short of the
+// bottom edge; the page itself (100% of the root, i.e. 100vh) is 1148pt, exactly the area from the
+// status bar to the bottom edge. So the box takes 100vh there. In a browser tab 100vh can be taller
+// than the visible area (Safari's toolbars), so tabs and windows keep the viewport (100%).
 function fitScreen() {
   const app = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  document.documentElement.style.setProperty('--app-h', app ? document.documentElement.clientHeight + 'px' : '100%');
+  document.documentElement.style.setProperty('--app-h', app ? '100vh' : '100%');
 }
 fitScreen();
 measureStage();
@@ -1436,6 +1437,49 @@ function backToStart() {
 function stillHere() { clearTimeout(idleTimer); idleTimer = setTimeout(backToStart, IDLE_MS); }
 for (const ev of ['pointerdown', 'wheel', 'keydown']) addEventListener(ev, stillHere, { capture: true, passive: true });
 stillHere();
+
+// ---------- TEMPORARY: layout readout for the installed app ----------
+// Five quick taps in the top-left corner (over the title) show what iOS reports for the screen,
+// viewport and safe areas; five more hide it. For sizing the layout box on the iPad (see
+// fitScreen); remove once that is settled.
+{
+  let taps = [], el = null;
+  const probe = (css) => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:0;top:0;width:1px;visibility:hidden;pointer-events:none;' + css;
+    document.documentElement.appendChild(d);
+    const v = d.getBoundingClientRect().height; d.remove();
+    return Math.round(v * 10) / 10;
+  };
+  const rect = (e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.top)}..${Math.round(r.bottom)} (${Math.round(r.height)})`; };
+  addEventListener('pointerdown', (e) => {
+    if (e.clientX > 320 || e.clientY > 160) return;
+    const now = performance.now();
+    taps = taps.filter((t) => now - t < 2500).concat(now);
+    if (taps.length < 5) return;
+    taps = [];
+    if (el) { el.remove(); el = null; return; }
+    el = document.createElement('pre');
+    el.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99;margin:0;padding:14px 18px;' +
+      'max-width:min(560px,90vw);white-space:pre-wrap;background:#fff;color:#000;font:13px/1.5 ui-monospace,Menlo,monospace;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.25);pointer-events:none;';
+    const vv = window.visualViewport;
+    el.textContent = [
+      `standalone ${navigator.standalone} / display-mode ${matchMedia('(display-mode: standalone)').matches}`,
+      `screen ${screen.width} x ${screen.height}   dpr ${devicePixelRatio}`,
+      `inner ${innerWidth} x ${innerHeight}`,
+      `client ${document.documentElement.clientWidth} x ${document.documentElement.clientHeight}`,
+      `visualViewport ${vv ? `${vv.width} x ${vv.height} top ${vv.offsetTop} scale ${vv.scale}` : '-'}`,
+      `100vh ${probe('height:100vh')}  100lvh ${probe('height:100lvh')}  100svh ${probe('height:100svh')}  100dvh ${probe('height:100dvh')}`,
+      `fixed 100% ${probe('position:fixed;height:100%')}`,
+      `safe-area top ${probe('height:env(safe-area-inset-top,0px)')} bottom ${probe('height:env(safe-area-inset-bottom,0px)')}`,
+      `--app-h ${document.documentElement.style.getPropertyValue('--app-h')}`,
+      `body ${rect(document.body)}  canvas ${rect(renderer.domElement)}`,
+      `tools ${rect(document.querySelector('.tools'))}  rail ${rect(document.querySelector('.rail'))}`,
+      navigator.userAgent.replace(/^Mozilla\/5\.0 /, ''),
+    ].join('\n');
+    document.body.appendChild(el);
+  }, { capture: true, passive: true });
+}
 
 // Safari's own pinch gesture (it can zoom the page past user-scalable=no); the 3D view's pinch
 // runs on pointer events and is not affected
