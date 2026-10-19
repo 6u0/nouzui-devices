@@ -20,6 +20,10 @@
 :root {
   --bg-top: #f5f5f7;
   --bg-bottom: #e8e8ed;
+  --backdrop:
+    radial-gradient(60% 50% at 70% 20%, rgba(0, 136, 255, 0.07), transparent 70%),
+    radial-gradient(50% 45% at 15% 85%, rgba(255, 149, 0, 0.05), transparent 70%),
+    radial-gradient(90% 80% at 45% 45%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
   --label: #000000;                       /* iOS label */
   --label-2: rgba(60, 60, 67, 0.6);       /* secondaryLabel */
   --label-3: rgba(60, 60, 67, 0.3);       /* tertiaryLabel */
@@ -46,10 +50,7 @@ html, body { height: 100%; }
 body {
   margin: 0; overflow: hidden; color: var(--label); font-family: var(--font-ui);
   font-size: 17px; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
-  background:
-    radial-gradient(60% 50% at 70% 20%, rgba(0, 136, 255, 0.07), transparent 70%),
-    radial-gradient(50% 45% at 15% 85%, rgba(255, 149, 0, 0.05), transparent 70%),
-    radial-gradient(90% 80% at 45% 45%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
+  background: var(--backdrop);
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
   touch-action: none;
 }
@@ -60,10 +61,10 @@ body * { touch-action: pan-x pan-y; }
 button { font-family: inherit; color: inherit; letter-spacing: inherit; }
 /* The page is one box, body, and everything is placed inside it (position: absolute), so the
    whole layout follows its size. Normally that is the viewport. In the installed app with the
-   transparent status bar, iOS draws from the top of the screen but reports a viewport shorter than
-   the screen (32pt on the iPad it was measured on): the 3D view stopped short of the bottom edge and
-   the bottom controls sat too high. fitScreen() then sets --app-h to the real screen height. */
-html { background: var(--bg-bottom); }
+   transparent status bar, iOS puts fixed content below the status bar but makes it a status bar
+   too short, so it stopped short of the bottom edge; fitScreen() then sets --app-h (see there).
+   Behind the status bar only the html background shows: the same backdrop, so it runs on unbroken. */
+html { background: var(--backdrop); }
 body { position: fixed; left: 0; top: 0; width: 100%; height: var(--app-h, 100%); }
 #stage { position: absolute; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; }
@@ -674,15 +675,14 @@ const stage = document.getElementById('stage');
 // size of the 3D stage in CSS px = the layout box (body), which can be taller than innerHeight
 let VW = innerWidth, VH = innerHeight;
 const measureStage = () => { VW = stage.clientWidth || innerWidth; VH = stage.clientHeight || innerHeight; };
-// Installed app filling the screen (home-screen PWA on iPad / iPhone): size the layout box to the
-// screen itself, since iOS reports a shorter viewport there (see body in the CSS). A browser tab
-// or a Stage Manager / Split View window keeps the viewport.
+// Installed app (home-screen PWA) with the transparent status bar. Measured on an iPad Air 11"
+// (two screenshots): screen 1180pt, status bar 32pt, page (html) 1148pt from the top of the screen,
+// but fixed content runs from 32pt and only 1116pt tall, one status bar short of the bottom edge.
+// The page height is the right height for the area below the status bar, so the box takes it. In a
+// browser tab or a Stage Manager / Split View window the two are the same and nothing changes.
 function fitScreen() {
   const app = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
-  const sw = innerWidth > innerHeight ? long : short, sh = innerWidth > innerHeight ? short : long;
-  const full = app && Math.abs(innerWidth - sw) <= 1 && sh > innerHeight;
-  document.documentElement.style.setProperty('--app-h', full ? sh + 'px' : '100%');
+  document.documentElement.style.setProperty('--app-h', app ? document.documentElement.clientHeight + 'px' : '100%');
 }
 fitScreen();
 measureStage();
