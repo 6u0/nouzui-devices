@@ -682,7 +682,15 @@ scene.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(32, VW / VH, 1, 3000);
 const HOME = { pos: new THREE.Vector3(225, 188, 255), target: new THREE.Vector3(0, 38, 0) };
-camera.position.copy(HOME.pos);
+// Auto-rotate is driven by the wall clock instead of OrbitControls' per-frame autoRotate: one turn every
+// SPIN_PERIOD_MS, at clock phase 0 the view is HOME. Every device showing the page therefore faces the
+// same way after a reset (iOS keeps Date.now() within a few ms of network time), and the speed no longer
+// depends on the frame rate (120 Hz iPads spun twice as fast before).
+const SPIN_PERIOD_MS = 50000;  // same speed as the old autoRotateSpeed 1.2 at 60 fps
+const UP = new THREE.Vector3(0, 1, 0);
+const spinAngle = (ms) => -2 * Math.PI * ((ms % SPIN_PERIOD_MS) / SPIN_PERIOD_MS);  // clockwise from above
+const homeOffset = () => HOME.pos.clone().sub(HOME.target).applyAxisAngle(UP, spinAngle(Date.now()));
+camera.position.copy(HOME.target).add(homeOffset());
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.copy(HOME.target);
@@ -690,8 +698,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 60;
 controls.maxDistance = 1000;
-controls.autoRotateSpeed = 1.2;
-controls.autoRotate = true;  // on at start; the 自動回転 chip toggles it
+let spinning = true;  // on at start; the 自動回転 chip toggles it (see SPIN_PERIOD_MS)
 
 const key = new THREE.DirectionalLight(0xfff6ea, 1.8);
 key.position.set(160, 320, 180);  // far enough that the fully exploded stack stays inside the shadow camera
@@ -1032,19 +1039,26 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 // ---------- Tools ----------
 const toggle = (id, fn) => { const b = document.getElementById(id); b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); fn(on); }); };
 toggle('t-ghost', (on) => { S.ghost = on; applyLook(); });
-toggle('t-spin', (on) => { controls.autoRotate = on; });
+toggle('t-spin', (on) => { spinning = on; });
 // 視点を戻す: ease toward the home view for a short while. It must always end — with auto-rotate on
 // the camera never quite reaches the goal, and a fly left running would keep pulling the view back.
 let fly = null;
 const FLY_MS = 1200;
-function flyTo(pos, target) { fly = { pos: pos.clone(), target: target.clone(), until: performance.now() + FLY_MS }; }
-controls.addEventListener('start', () => { fly = null; });  // the user takes over: stop at once
+// sync: the goal keeps turning with the clock, so the view lands in step with the other devices
+function flyTo(pos, target, sync = false) {
+  fly = { off: pos.clone().sub(target), target: target.clone(), sync, until: performance.now() + FLY_MS };
+}
+const flyGoal = () => fly.target.clone().add(fly.sync ? fly.off.clone().applyAxisAngle(UP, spinAngle(Date.now())) : fly.off);
+const azimuth = (v) => Math.atan2(v.x, v.z);
+let interacting = false, lastSpinMs = Date.now();
+controls.addEventListener('end', () => { interacting = false; });
+controls.addEventListener('start', () => { fly = null; interacting = true; });  // the user takes over: stop at once
 const viewTargetY = (t) => 38 + stackRise(t) * 0.5;
 const zoomFactor = (t) => 1 + stackRise(t) / 160;
 // the home view, framed for explode t (the stack's height and centre change with it)
 function flyHome(t) {
   const target = new THREE.Vector3(0, viewTargetY(t), 0);
-  flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target);
+  flyTo(HOME.pos.clone().sub(HOME.target).multiplyScalar(zoomFactor(t)).add(target), target, spinning);
 }
 document.getElementById('t-reset').addEventListener('click', () => flyHome(S.explodeShown));
 
@@ -1395,9 +1409,22 @@ renderer.setAnimationLoop((time) => {
     camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);
   }
   if (fly) {
-    camera.position.lerp(fly.pos, 0.12); controls.target.lerp(fly.target, 0.12);
-    if (camera.position.distanceTo(fly.pos) < 0.5 || performance.now() > fly.until) fly = null;
+    const goal = flyGoal();
+    camera.position.lerp(goal, 0.12); controls.target.lerp(fly.target, 0.12);
+    if (camera.position.distanceTo(goal) < 0.5 || performance.now() > fly.until) {
+      // land exactly on the clock's angle, so this device stays in step from here on
+      if (fly.sync) {
+        const v = camera.position.clone().sub(controls.target);
+        camera.position.copy(controls.target).add(v.applyAxisAngle(UP, azimuth(goal.clone().sub(fly.target)) - azimuth(v)));
+      }
+      fly = null;
+    }
+  } else if (spinning && !interacting) {
+    // turn by the clock time since the last frame: the phase (and any offset a drag left) is kept
+    const v = camera.position.clone().sub(controls.target);
+    camera.position.copy(controls.target).add(v.applyAxisAngle(UP, spinAngle(Date.now()) - spinAngle(lastSpinMs)));
   }
+  lastSpinMs = Date.now();
   controls.update();
   updateFrame();
   updateFlow(time);
