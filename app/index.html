@@ -1393,7 +1393,9 @@ renderer.setAnimationLoop((time) => {
   frame++;
   const k = reduce ? 1 : 0.14;
   const prevT = S.explodeShown;
-  S.explodeShown += (S.explode - S.explodeShown) * k;
+  // the idle pulse keeps its own timing (1 s up, 1 s held, 1 s down): follow it exactly
+  if (updatePulse(performance.now())) S.explodeShown = S.explode;
+  else S.explodeShown += (S.explode - S.explodeShown) * k;
   if (Math.abs(S.explode - S.explodeShown) < 1e-4) S.explodeShown = S.explode;
   // touch the DOM only when the number changes (a write before the glass rect reads forces a layout)
   const mm = Math.round(stackRise(S.explodeShown));
@@ -1452,6 +1454,7 @@ renderer.setAnimationLoop((time) => {
 const IDLE_MS = 5 * 60 * 1000;
 let idleTimer = 0;
 function backToStart() {
+  pulse = null;
   if (S.mode !== 'explore') setMode('explore');
   select(null);
   if (LANG !== 'zh') setLang('zh');
@@ -1461,7 +1464,32 @@ function backToStart() {
   setExplode(0);
   flyHome(0);
 }
-function stillHere() { clearTimeout(idleTimer); idleTimer = setTimeout(backToStart, IDLE_MS); }
+// While nobody touches it, every 3–4 minutes (random each time) the stack opens to full explode and
+// closes again to catch the eye: 1 s up, 1 s held, 1 s down, back to where it was. Only in 観察 (the
+// tour sets its own explode per step). A touch stops it and the stack goes back to where it was.
+const PULSE_MIN_MS = 3 * 60 * 1000, PULSE_MAX_MS = 4 * 60 * 1000;
+let pulseTimer = 0, pulse = null;
+function schedulePulse() {
+  clearTimeout(pulseTimer);
+  pulseTimer = setTimeout(startPulse, PULSE_MIN_MS + Math.random() * (PULSE_MAX_MS - PULSE_MIN_MS));
+}
+function startPulse() {
+  if (S.mode === 'explore' && !pulse) pulse = { t0: performance.now(), from: S.explode };
+  schedulePulse();
+}
+function stopPulse() { if (pulse) { setExplode(pulse.from); pulse = null; } }
+// called by the render loop; true while a pulse is running (it then sets the explode itself)
+function updatePulse(now) {
+  if (!pulse) return false;
+  const t = (now - pulse.t0) / 1000, ease = (x) => x * x * (3 - 2 * x), lift = 1 - pulse.from;
+  if (t >= 3) { stopPulse(); return false; }
+  setExplode(pulse.from + lift * (t < 1 ? ease(t) : t < 2 ? 1 : 1 - ease(t - 2)));
+  return true;
+}
+function stillHere() {
+  clearTimeout(idleTimer); idleTimer = setTimeout(backToStart, IDLE_MS);
+  stopPulse(); schedulePulse();
+}
 for (const ev of ['pointerdown', 'wheel', 'keydown']) addEventListener(ev, stillHere, { capture: true, passive: true });
 stillHere();
 
