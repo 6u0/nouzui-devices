@@ -1798,7 +1798,7 @@ stillHere();
 // ---------- Layout readout ----------
 // Five quick taps in the top-left corner (over the title) show what iOS reports for the screen,
 // viewport and safe areas (for sizing the layout box on the iPad, see fitScreen). It shows for
-// READOUT_MS and then fades out in 0.1 s by itself, so on a kiosk it can never be left up.
+// READOUT_MS and then fades out in 1 s by itself, so on a kiosk it can never be left up.
 const READOUT_MS = 2000;
 {
   let taps = [], el = null, hideTimer = 0;
@@ -1820,7 +1820,7 @@ const READOUT_MS = 2000;
     clearTimeout(hideTimer);
     el = document.createElement('pre');
     el.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99;margin:0;padding:14px 18px;' +
-      'max-width:min(560px,90vw);white-space:pre-wrap;background:#fff;color:#000;font:13px/1.5 ui-monospace,Menlo,monospace;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.25);pointer-events:none;transition:opacity .1s;';
+      'max-width:min(560px,90vw);white-space:pre-wrap;background:#fff;color:#000;font:13px/1.5 ui-monospace,Menlo,monospace;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.25);pointer-events:none;transition:opacity 1s;';
     const vv = window.visualViewport;
     el.textContent = [
       `standalone ${navigator.standalone} / display-mode ${matchMedia('(display-mode: standalone)').matches}`,
@@ -1840,7 +1840,7 @@ const READOUT_MS = 2000;
     const shown = el;
     hideTimer = setTimeout(() => {
       shown.style.opacity = '0';
-      setTimeout(() => { shown.remove(); if (el === shown) el = null; }, 120);
+      setTimeout(() => { shown.remove(); if (el === shown) el = null; }, 1050);
     }, READOUT_MS);
   }, { capture: true, passive: true });
 }
