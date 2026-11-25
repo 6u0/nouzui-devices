@@ -260,9 +260,9 @@ body.touring .tools, body.touring .sheet { display: none; }
 <div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
 
 <header class="titleblock">
-  <div class="eyebrow-row"><span class="eyebrow">Headgear · v3.4</span></div>
+  <div class="eyebrow-row"><span class="eyebrow">Headgear · SIGGRAPH</span></div>
   <h1 data-i18n="title">ヘッドギアの中身</h1>
-  <span class="dims">171.7 × 297.6 × 235.2 mm · 1244 solids</span>
+  <span class="dims">171.7 × 297.6 × 235.2 mm · 534 solids</span>
 </header>
 
 <nav class="modes glass" data-i18n-aria="modes" aria-label="表示モード">
@@ -270,9 +270,10 @@ body.touring .tools, body.touring .sheet { display: none; }
   <button id="mode-tour" aria-pressed="false" data-i18n="tour">しくみ</button>
 </nav>
 
-<nav class="modes langs glass" aria-label="言語 / 語言">
+<nav class="modes langs glass" aria-label="Language / 言語 / 語言">
+  <button id="lang-en" aria-pressed="true" lang="en">English</button>
   <button id="lang-ja" aria-pressed="false" lang="ja">日本語</button>
-  <button id="lang-zh" aria-pressed="true" lang="zh-Hant">繁中</button>
+  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
 </nav>
 
 <div class="rail glass lit">
@@ -334,40 +335,45 @@ const FRONT = (c) => c.y < -25;  // the stand and the mirror servo sit in front 
 const PLA = { vertexColors: false, color: 0xf3f3ef, metalness: 0, roughness: 0.52 };
 const PARTS = [
   { id: 'case', ref: 'H1', name: '電子部品ケース（上部ドーム）', en: 'components_case', sel: /^components_case(_cover)?$/, finish: PLA, level: 4, ghost: true,
-    desc: '頭の上に載る白いドーム。中に ESP32・サーボドライバー・心拍センサー・距離センサー・アンロック用サーボが収まっています。後ろ側の2つの丸穴にはDCジャックが付き、下側の開口部からサーボのケーブルが入ります。',
-    spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['外形', '約 136 × 85 × 82 mm'], ['DCジャック', '後ろ側に2つ（CADには部品なし）']] },
-  { id: 'esp32', ref: 'U1', name: 'ESP32 開発ボード', en: 'ESP32 DevKit (38 pin)', sub: '制御・頭脳', sel: /^PCB_ESP32/, level: 3, layer: 1, callout: true,
-    desc: 'ヘッドギアの頭脳。Wi‑FiでPCとつながり、OSCメッセージを受け取ってサーボを動かし、心拍と距離の値を送り返します。通信・サーボ・センサーの処理はCore1のタスクで回り、5秒止まるとウォッチドッグが自動で再起動します。',
-    spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9003）'], ['I²C', 'PCA9685（0x40）・VL53L0X'], ['入力', '心拍 GPIO25（割り込み）'], ['表示', 'LED GPIO2（Wi‑Fi接続中は点灯）'], ['安定動作', 'ウォッチドッグ 5秒 / Wi‑Fi自動再接続']] },
+    desc: '頭の上に載る白いドーム。中に XIAO・サーボドライバー・頭部衝撃用のサーボ・リール・心拍センサー用のジャックが収まっています。サーボのケーブルは下側からケースの中へ入ります。',
+    spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['外形', '約 138 × 101 × 91 mm（ふた込み）']] },
+  { id: 'xiao', ref: 'U1', name: 'XIAO nRF52840 Sense', en: 'Seeed Studio XIAO nRF52840 Sense', sub: '制御・頭脳（Bluetooth LE）', sel: /^XIAO-nRF52840/, level: 3, layer: 1, callout: true,
+    desc: 'ヘッドギアの頭脳となる親指大のマイコン基板。脳デバイスとBluetooth LEでつながり、送られてくるフェーズやサーボの値に合わせてサーボ8個を動かします。耳クリップの心拍センサーの拍を脳デバイスへ知らせ、椅子にはケーブル（UART）で「倒す・起こす」を指示します。',
+    spec: [['無線', 'Bluetooth LE（NozuiHeadgear-X1。脳デバイスがつなぎに来る）'], ['I²C', 'PCA9685（0x40、400 kHz）'], ['入力', '心拍 D0（立ち上がり）'], ['椅子', 'UART D6（TX）/ D7（RX）・9600 bps'], ['LED', '赤点滅：未接続 / 緑：接続中 / 青：受信'], ['記録', '動作ログを内蔵2MBフラッシュに保存']] },
+  { id: 'xiaocover', ref: 'H6', name: 'XIAOカバー', en: 'XIAO_cover', sel: /^XIAO_cover$/, finish: PLA, level: 3, layer: 1.8,
+    desc: 'XIAOを覆って固定する樹脂のカバー。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
   { id: 'pca', ref: 'U2', name: 'PCA9685 サーボドライバー', en: 'PCA9685 16ch', sub: 'サーボ8個をまとめて制御', sel: /^PCA9685/, level: 3, layer: 0.5, callout: true,
-    desc: 'ESP32からI²Cで指示を受けて、16ch分のPWM信号を作る基板。このヘッドギアでは8ch（ch0〜3・ch12〜15）を使い、50Hzのパルス幅でサーボの角度を決めます。パルスの出だしをチャンネルごとに少しずつずらし、電流が一度に集中しないようにしています。',
-    spec: [['接続', 'I²C（アドレス 0x40）'], ['PWM', '50 Hz・パルス幅 0.5〜2.5 ms（0〜180°）'], ['使用ch', 'サーボ #0〜3 → ch0〜3 / #4〜7 → ch12〜15'], ['更新', '20 msごと（角度が変わったchだけ書き込む）']] },
-  { id: 'unlock', ref: 'M2', name: 'SG90（アンロック）', en: 'SG90 · servo #6', sub: '出力（/unlock）', sel: /Sg90#1\//, horns: 'sg90', level: 3, callout: true,
-    desc: 'ケースの中にある小型サーボ。フェーズ5で /unlock 1 を受け取ると30°まで回り、0.5秒たつと自動で0°に戻ります。',
+    desc: 'XIAOからI²Cで指示を受けて、16ch分のPWM信号を作る基板。このヘッドギアでは8ch（ch0〜3・ch12〜15）を使い、50Hzのパルス幅でサーボの角度を決めます。',
+    spec: [['接続', 'I²C（アドレス 0x40）'], ['PWM', '50 Hz・パルス幅 0.5〜2.4 ms（MG90S）'], ['使用ch', '#0〜3 → ch0〜3 / #4・5 → ch12・13 / 頭部衝撃 #6 → ch14 / ミラー #7 → ch15'], ['更新', '1chずつ約8 msごと（6chで約50 ms）']] },
+  { id: 'impact', ref: 'M2', name: 'SG90（頭部衝撃）', en: 'SG90 · servo #6', sub: '出力（フェーズ6）', sel: /Sg90#1\//, horns: 'sg90', level: 2, callout: true,
+    desc: 'ケースの中にある小型サーボ。フェーズ6に入った瞬間に30°まで回り、0.5秒たつと0°に戻ります。',
     spec: [['担当', 'サーボ #6（ch14）'], ['動き', '0° → 30° → 0.5秒後に 0°'], ['角度の上限', '35°']] },
-  { id: 'heart', ref: 'U3', name: '心拍センサー', en: 'heart-rate sensor', sub: '入力（GPIO25）', sel: /^30100/, level: 3, layer: 1, callout: true,
-    desc: '脈拍を検出するセンサー。1拍ごとに出る信号の立ち上がりをESP32が割り込みで数え、フェーズ3〜4のあいだ、1拍ごとに /heartrate 1 をPCへ送ります。',
-    spec: [['接続', 'GPIO25（立ち上がりで割り込み）'], ['ノイズ対策', '200 ms未満の間隔は無視（最大 300 bpm）'], ['起動直後', '最初の10拍は送らない'], ['PCへ送信', '/heartrate 1（フェーズ3〜4）'], ['CAD上の形状', 'MAX30100 モジュール']] },
-  { id: 'tof', ref: 'U4', name: 'VL53L0X 距離センサー', en: 'VL53L0X ToF', sub: '入力（I²C）', sel: /^VL53L0X/, level: 3, layer: 2, callout: true,
-    desc: 'レーザー光が往復する時間で距離を測るToFセンサー。ケースの上部にあり、フェーズ3のあいだ100msごとに測定値を読み、50msごとに /braindistance（mm）としてPCへ送ります。',
-    spec: [['接続', 'I²C（PCA9685と共用）'], ['測定', '連続測定 50 ms / 読み取り 100 msごと'], ['PCへ送信', '/braindistance（mm、50 msごと・フェーズ3）'], ['失敗時', '初期化できなくても距離なしで動作を続ける']] },
-  { id: 'latch', ref: 'H4', name: 'バネ・リールまわり', en: 'spring / reelcover / coil_cover', sel: /^(spring|reelcover|coil_cover)$/, finish: PLA, level: 2,
-    desc: 'バネ（spring）と、リールのカバー、コイルのカバー。ケースの中のアンロック用サーボと組み合わさる部分です。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
+  { id: 'trrs', ref: 'J1', name: '心拍センサー用ジャック', en: 'TRRS breakout', sub: '入力（D0）', sel: /^TRRSBreakout/, level: 3, layer: 1, callout: true,
+    desc: 'Grove の耳クリップ心拍センサーを差し込む4極ジャック。センサーは耳たぶに挟み、1拍ごとに出る信号の立ち上がりをXIAOがD0で数えます。最初の10拍を捨てたあと、1拍ごとに脳デバイスへ知らせます（脳デバイスはフェーズ3・4のとき心拍の振動を鳴らします）。',
+    spec: [['センサー', 'Grove 耳クリップ心拍センサー（CADには部品なし）'], ['接続', 'D0（立ち上がり）'], ['ノイズ対策', '前の拍から350 ms以内（171 bpm超）と、最近の間隔の60%より早い拍は無視'], ['起動直後', '最初の10拍は送らない（フェーズ1に入るたびに数え直す）'], ['脳デバイスへ', 'HEART の通知 [0x10][通し番号]']] },
+  { id: 'reel', ref: 'H4', name: 'リール', en: 'reel / reelcover', sel: /^(reel|reelcover)$/, finish: PLA, level: 2,
+    desc: 'ケースの中のリールと、そのカバー。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
   { id: 'headmove', ref: 'H3', name: '可動プレート', en: 'head_move', sel: /^head_move/, finish: PLA, level: 2, ghost: true,
     desc: 'ケースの下にある円盤状のプレート。ケースとヘッドバンドのあいだに入ります。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
-  { id: 'servos', ref: 'M1', name: 'MG90S サーボ ×6', en: 'MG90S', sub: '出力（/power）', sel: /^M90S_ali/, horns: 'mg90s', level: 1, anchor: 'one', callout: true,
-    desc: 'ヘッドバンドの左右に3個ずつ並んだ、金属ギアの小型サーボ。PCから届く /power の6chの値に合わせて、腕（ホーン）の角度を変えます。',
-    spec: [['担当', 'サーボ #0〜5（ch0〜3・ch12〜13）'], ['角度', '/power 0〜100 → 0〜90°（各サーボ 40° で頭打ち）'], ['動く時', 'フェーズ2〜4（フェーズ2の開始で 0° に戻す）'], ['向き', 'サーボごとに回転方向の反転設定あり']] },
+  { id: 'servos', ref: 'M1', name: 'MG90S サーボ ×6', en: 'MG90S', sub: '出力（圧力の値）', sel: /^M90S_ali/, horns: 'mg90s', level: 1, anchor: 'one', callout: true,
+    desc: 'ヘッドバンドの左右に3個ずつ並んだ、金属ギアの小型サーボ。脳デバイスが送ってくる6chの値（圧力センサーから作ったもの）に合わせて、腕（ホーン）の角度を変えます。',
+    spec: [['担当', 'サーボ #0〜5（ch0〜3・ch12〜13）'], ['角度', '値 0〜100 → 0〜60°'], ['動く時', 'フェーズ2（収録した15秒の動き）・フェーズ3/4（脳デバイスから1秒に20回）'], ['止める時', '停止の指示か、値が1秒届かないとき：ゆっくり0°に戻して脱力'], ['向き', 'サーボごとに回転方向の反転設定あり']] },
   { id: 'frame', ref: 'H2', name: 'ヘッドバンドフレーム', en: 'top / servomount', sel: /^(top|top_L|top_R|back_attach|front_attach|servomount_\d|COMPOUND)$/, where: (c) => !FRONT(c), finish: PLA, level: 1,
     desc: '頭にかぶる部分の骨組み。左右のサーボマウントにMG90Sが3個ずつ固定されています。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['部品', 'top / top_L / top_R / back_attach / front_attach / servomount ×6 ほか']] },
-  { id: 'mirror', ref: 'M3', name: 'SG90（ミラー）', en: 'SG90 · servo #7', sub: '出力（/mirror）', sel: /Sg90#2\//, horns: 'sg90', level: 0, callout: true,
-    desc: '前方のスタンドに付いた小型サーボ。フェーズ6で /mirror 1 を受け取ると2秒かけて170°まで、フェーズ7で /mirror 0 を受け取ると2秒かけて0°まで、なめらかに回ります。',
-    spec: [['担当', 'サーボ #7（ch15）'], ['動き', '0° ⇄ 170°（2秒かけて一定の速さで）'], ['フェーズ', '6：170°へ / 7：0°へ戻す']] },
+  { id: 'mirrorrod', ref: 'H7', name: 'ミラーのロッド', en: 'mirror rod', sel: /Sg90#2\/mirror_rod$/, finish: PLA, level: 0,
+    desc: 'サーボの腕の先とミラーの台の右側の出っ張りをつなぐ長い棒。腕が回ると台を引き上げます。',
+    spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['つなぎ先', 'サーボの腕の先 ⇄ 台の右側の出っ張り']] },
+  { id: 'mirrorplate', ref: 'H8', name: 'ミラーの台', en: 'mirror plate', sel: /Sg90#2\/mirror_plate$/, finish: PLA, level: 0,
+    desc: '前方の床に置かれた板で、表面にミラーが貼ってあります。後ろ側の蝶番を支点に、サーボの約半分の角度で起き上がります。',
+    spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント'], ['動き', 'サーボ 170° で約 85°']] },
+  { id: 'mirror', ref: 'M3', name: 'SG90（ミラー）', en: 'SG90 · servo #7', sub: '出力（フェーズ6）', sel: /Sg90#2\//, horns: 'sg90', level: 0, callout: true,
+    desc: '前方のスタンドに付いた小型サーボ。ロッドでミラーの台とつながっていて、フェーズ6に入ると2秒かけて170°まで、フェーズ6から出ると2秒かけて0°まで、なめらかに回ります。',
+    spec: [['担当', 'サーボ #7（ch15）'], ['動き', '0° ⇄ 170°（2秒かけて一定の速さで）'], ['フェーズ', '6に入る：170°へ / 6から出る：0°へ戻す']] },
   { id: 'stand', ref: 'H5', name: 'スタンド', en: 'stand', sel: /^COMPOUND$/, where: FRONT, finish: PLA, level: 0,
     desc: 'ヘッドギアを支える台。前の方にミラー用のサーボが付いています。', spec: [['材質', 'PLA Basic（ホワイト）・3Dプリント']] },
   { id: 'cables', ref: 'W1', name: 'サーボケーブル ×8', en: 'servo leads', sub: 'CADにはない配線', cables: true,
-    desc: '各サーボの3本の線（茶：GND・赤：電源・橙：信号）を、ヘッドバンドの外側に沿わせてケース後ろの窓から中へ入れ、PCA9685のピンにコネクタで差しています。CADには含まれていないため、実物の配線を参考に描いたイメージです。',
-    spec: [['線の色', '茶 GND / 赤 V+ / 橙 信号'], ['つなぎ先', 'サーボ #0〜3 → ch0〜3 / #4〜7 → ch12〜15'], ['経路', 'ヘッドバンドの外側 → ケース後ろの窓 → PCA9685（ケース内のSG90だけは内側を通る）']] },
+    desc: '各サーボの3本の線（茶：GND・赤：電源・橙：信号）を、ヘッドバンドの外側に沿わせてケースの中へ入れ、PCA9685のピンにコネクタで差しています。CADには含まれていないため、実物の配線を参考に描いたイメージです。',
+    spec: [['線の色', '茶 GND / 赤 V+ / 橙 信号'], ['つなぎ先', 'サーボ #0〜3 → ch0〜3 / #4〜7 → ch12〜15'], ['経路', 'ヘッドバンドの外側 → ケースの後ろ → PCA9685（ケース内のSG90だけは内側を通る）']] },
 ];
 const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
 // Explode: floors rise in order (stand → headband + servos → plate → electronics → case), each one
@@ -382,7 +388,7 @@ const BASE_LIFT = 10;  // mm the bottom floor (stand) rises at 100%
 // env: reflection strength. Set per material (scene.environmentIntensity, 0.55, keeps the white PLA
 // from glaring); metals need the full room to read as metal, glossy plastics a little more than PLA.
 const MAT = {
-  tin:     { metalness: 1, roughness: 0.26, env: 1 },  // tinned leads, pads, RF shield, USB shell
+  tin:    { metalness: 1, roughness: 0.26, env: 1 },  // tinned leads, pads, RF shield, USB shell
   gold:    { metalness: 1, roughness: 0.2, env: 1 },   // ENIG pads, gold-flashed header pins
   brass:   { metalness: 1, roughness: 0.3, env: 1 },   // MG90S bushings
   steel:   { metalness: 1, roughness: 0.34, env: 1 },  // screws, output shafts, terminal screws
@@ -497,97 +503,158 @@ function finishMaterial(f, opts = { vertexColors: true }) {
     ...(env ? { envMap: scene.environment, envMapIntensity: env } : {}) });
 }
 // ---------- How-it-works tour ----------
-// Based on headset_esp32.ino v3.4.
+// Based on NozuiHeadgear_SIGGRAPH.ino (source/).
 const TOUR = [
-  { tab: '全体', labels: ['esp32', 'pca', 'servos', 'heart', 'tof'], title: '全体の構成', flow: 'PC ⇄ Wi‑Fi / OSC ⇄ ESP32 → PCA9685 → サーボ ×8', parts: [], explode: 0.42, ghost: true,
-    text: 'ESP32がWi‑Fi経由でPCとOSCメッセージをやりとりします。PCが /phase でフェーズ（1〜7）を指示し、ヘッドギアはフェーズに応じてサーボを動かしたり、心拍や距離の値を送ったりします。8個のサーボは、すべてPCA9685というサーボドライバーにつながっています。' },
-  { tab: '通信', labels: ['esp32'], title: 'PCとのやりとり（OSC）', flow: 'PC → /phase /power /unlock /mirror /init /reboot ／ ESP32 → /ask /heartrate /braindistance', path: [], parts: ['esp32'], explode: 0.42,
-    text: '起動するとWi‑Fiにつながり、PCへ /ask を送ります。受信はポート9000、送信は9003です。Wi‑Fiが切れても自動で再接続し、そのあいだもサーボの動きやOSCの受信は止まりません。処理が5秒止まるとウォッチドッグが再起動し、起動時にもう一度 /ask を送ります。' },
-  { tab: '圧力', labels: ['servos', 'pca'], title: '出力：/power でサーボ6個を動かす', flow: '/power（6ch・0〜100）→ ESP32 → I²C → PCA9685 → MG90S ×6', path: ['esp32', 'pca', 'servos'], cables: [0, 1, 2, 3, 4, 5], demo: 'power', parts: ['esp32', 'pca', 'servos', 'cables'], explode: 0.5,
-    text: 'フェーズ2〜4のあいだ、PCから届く /power の6chの値（0〜100）を、サーボ #0〜5 の角度に変えます。値は0〜90°に換算されますが、各サーボは40°で止まるように上限が付いています。脳デバイスが送る /power と同じ6chの形式です。フェーズ2に入ると、6個とも0°に戻ります。' },
-  { tab: '心拍', labels: ['heart', 'esp32'], title: '入力：心拍センサー', flow: '心拍センサー → GPIO25（割り込み）→ ESP32 → /heartrate', path: ['heart', 'esp32'], parts: ['heart', 'esp32'], explode: 0.42,
-    text: '心拍センサーが1拍ごとに出す信号の立ち上がりを、ESP32が割り込みで数えます。200ms未満の間隔はノイズとして無視し、起動直後の10拍は送りません。フェーズ3〜4のあいだ、1拍ごとに /heartrate 1 をPCへ送ります。' },
-  { tab: '距離', labels: ['tof', 'esp32'], title: '入力：距離センサー（VL53L0X）', flow: 'VL53L0X → I²C → ESP32 → /braindistance（50msごと）', path: ['tof', 'esp32'], parts: ['tof', 'esp32'], explode: 0.42,
-    text: 'ケース上部のVL53L0Xが、レーザー光が往復する時間で距離を測ります。フェーズ3のあいだ100msごとに測定値を読み、50msごとに /braindistance（mm）としてPCへ送ります。センサーを初期化できなかったときは、距離なしで動作を続けます。' },
-  { tab: 'アンロック', labels: ['unlock', 'pca'], title: '出力：アンロック', flow: '/unlock 1 → PCA9685 ch14 → SG90 #6（30° → 0.5秒後に 0°）', path: ['esp32', 'pca', 'unlock'], cables: [6], demo: 'unlock', parts: ['esp32', 'pca', 'unlock', 'latch', 'cables'], explode: 0.5,
-    text: 'フェーズ5で /unlock 1 を受け取ると、ケースの中のSG90（サーボ #6）が30°まで回り、0.5秒たつと自動で0°に戻ります。' },
-  { tab: 'ミラー', labels: ['mirror', 'pca'], title: '出力：ミラー', flow: '/mirror 1 → 170°（2秒）／ /mirror 0 → 0°（2秒）', path: ['esp32', 'pca', 'mirror'], cables: [7], demo: 'mirror', parts: ['esp32', 'pca', 'mirror', 'cables'], explode: 0.4,
-    text: 'フェーズ6で /mirror 1 を受け取ると、前方のSG90（サーボ #7）が2秒かけて170°まで回ります。フェーズ7で /mirror 0 を受け取ると、同じく2秒かけて0°に戻ります。角度は20msごとに少しずつ更新されるので、なめらかに動きます。' },
+  { tab: '全体', labels: ['xiao', 'pca', 'servos', 'trrs'], title: '全体の構成', flow: '脳デバイス ⇄ BLE ⇄ XIAO → PCA9685 → サーボ ×8 ／ XIAO → UART → 椅子', parts: [], explode: 0.42, ghost: true,
+    text: 'XIAO nRF52840 SenseがBluetooth LEで脳デバイスとつながります。脳デバイスからフェーズとサーボの値を受け取り、PCA9685というサーボドライバーを通して8個のサーボを動かします。耳クリップの心拍センサーの拍は脳デバイスへ送り返し、フェーズ6では椅子に「倒す」を指示します。' },
+  { tab: '通信', labels: ['xiao'], title: '脳デバイスとのやりとり（BLE）', flow: '脳デバイス → 0x00 停止 / 0x01 フェーズ2 / 0x02 サーボ値 / 0x03 フェーズ ／ XIAO → 心拍', path: [], parts: ['xiao', 'xiaocover'], explode: 0.42,
+    text: 'ヘッドギアは「NozuiHeadgear-X1」という名前で待っていて、脳デバイスがつなぎに来ます。脳デバイスからは7バイトの指示が届きます：0x00（止めて0°へ）、0x01（フェーズ2の動きを再生）、0x02（6個のサーボの値）、0x03（今のフェーズ。1秒ごと）。0x03が3秒届かないと「切れた」とみなし、6個のサーボを0°に戻します。' },
+  { tab: '圧力', labels: ['servos', 'pca'], title: '出力：サーボ6個を動かす', flow: '0x02（6ch・0〜100）→ XIAO → I²C → PCA9685 → MG90S ×6', path: ['xiao', 'pca', 'servos'], cables: [0, 1, 2, 3, 4, 5], demo: 'power', parts: ['xiao', 'pca', 'servos', 'cables'], explode: 0.5,
+    text: 'フェーズ3・4のあいだ、脳デバイスが圧力センサーから作った6chの値（0〜100）が1秒に20回届き、サーボ #0〜5 の角度（0〜60°）に変えます。フェーズ2では、収録しておいた15秒の動きを1回再生します。値が1秒届かないときや停止の指示が来たときは、ゆっくり0°に戻して力を抜きます。' },
+  { tab: '心拍', labels: ['trrs', 'xiao'], title: '入力：心拍センサー', flow: '耳クリップ心拍センサー → ジャック → D0 → XIAO → BLE → 脳デバイス', path: ['trrs', 'xiao'], parts: ['trrs', 'xiao'], explode: 0.42,
+    text: '耳たぶに挟む心拍センサーが1拍ごとに出す信号の立ち上がりを、XIAOがD0で数えます。350ms以内や、最近の間隔の60%より早い拍は二重検出として無視し、最初の10拍は送りません。そのあとは1拍ごとに脳デバイスへ知らせ、脳デバイスがフェーズ3・4のとき心拍の振動を鳴らします。' },
+  { tab: '衝撃', labels: ['impact', 'pca'], title: '出力：頭部衝撃（フェーズ6）', flow: 'フェーズ6に入る → PCA9685 ch14 → SG90 #6（30° → 0.5秒後に 0°）', path: ['xiao', 'pca', 'impact'], cables: [6], demo: 'impact', parts: ['xiao', 'pca', 'impact', 'cables'], explode: 0.5,
+    text: 'フェーズ6に入った瞬間、ケースの中のSG90（サーボ #6）が30°まで回り、0.5秒たつと0°に戻ります。起動直後や通信が切れたあとなど、前のフェーズが分からないままフェーズ6になったときは動かしません。' },
+  { tab: 'ミラー', labels: ['mirror', 'mirrorplate', 'pca'], title: '出力：ミラー（フェーズ6）', flow: 'フェーズ6に入る → 170°（2秒）／ 出る → 0°（2秒）', path: ['xiao', 'pca', 'mirror'], cables: [7], demo: 'mirror', parts: ['xiao', 'pca', 'mirror', 'mirrorrod', 'mirrorplate', 'cables'], explode: 0.4,
+    text: 'フェーズ6に入ると、前方のSG90（サーボ #7）が2秒かけて170°まで回ります。腕の先とミラーの台はロッドでつながっていて、ロッドが台を引き上げ、ミラーの貼られた台が約85°まで起き上がります。フェーズ6から出ると、同じく2秒かけて0°に戻り、力を抜きます。' },
+  { tab: '椅子', labels: ['xiao'], title: '出力：椅子（UART）', flow: 'XIAO D6 / D7 ⇄ UART 9600 bps ⇄ 椅子（M5Atom）', path: [], parts: ['xiao'], explode: 0.42,
+    text: '椅子とはケーブルでつながり、4バイトの電文 [0xA5][種類][値][チェック] をやりとりします。フェーズ6に入ると「倒す」、出ると「起こす」を、電文が1つ壊れても届くよう3回ずつ送ります。0.2秒ごとに今のフェーズを合図として送り、椅子からは傾きの状態が返ってきます。' },
 ];
 
-// ---------- Language: 日本語 (default, in PARTS/TOUR above) / 繁體中文（台灣） ----------
+// ---------- Language: English (default, EN_*) / 日本語 (base text, in PARTS/TOUR above) / 繁體中文（台灣） ----------
 const UI = {
   ja: {
     title: 'ヘッドギアの中身', loading: 'LOADING MODEL…', loadFail: 'モデルを読み込めませんでした。ページを再読み込みしてください。',
     explore: '観察', tour: 'しくみ', explode: '分解', ghost: '外装を透かす', spin: '自動回転', reset: '視点を戻す',
     prev: '← 前へ', next: '次へ →',
     stage: 'ヘッドギアの3Dモデル。ドラッグで回転、ピンチで拡大', modes: '表示モード', track: '高さ方向の分解量', close: '閉じる',
-    demoPower: '/power を送ってみる（0〜100）', demoAuto: '自動', demoPowerNote: '数字は「送った値 → サーボの角度」。40°で頭打ちになります。',
-    demoUnlock: '/unlock 1 を送る', demoMirrorOpen: '/mirror 1（170°へ）', demoMirrorClose: '/mirror 0（0°へ）', demoAngle: 'いまの角度',
+    demoPower: 'サーボの値を送ってみる（0〜100）', demoAuto: '自動', demoPowerNote: '数字は「送った値 → サーボの角度」。100で60°です。',
+    demoImpact: 'フェーズ6に入る（30° → 0.5秒後に 0°）', demoMirrorOpen: 'フェーズ6に入る（170°へ）', demoMirrorClose: 'フェーズ6を出る（0°へ）', demoAngle: 'いまの角度',
   },
   zh: {
     title: '頭戴裝置的內部', loading: '模型載入中…', loadFail: '無法載入模型，請重新整理頁面。',
     explore: '觀察', tour: '運作原理', explode: '分解', ghost: '外殼透視', spin: '自動旋轉', reset: '重設視角',
     prev: '← 上一步', next: '下一步 →',
     stage: '頭戴裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉',
-    demoPower: '試著傳送 /power（0〜100）', demoAuto: '自動', demoPowerNote: '數字是「傳送的值 → 伺服馬達角度」，到 40° 封頂。',
-    demoUnlock: '傳送 /unlock 1', demoMirrorOpen: '/mirror 1（轉到 170°）', demoMirrorClose: '/mirror 0（回到 0°）', demoAngle: '目前角度',
+    demoPower: '試著傳送伺服數值（0〜100）', demoAuto: '自動', demoPowerNote: '數字是「傳送的值 → 伺服馬達角度」，100 對應 60°。',
+    demoImpact: '進入階段 6（30° → 0.5 秒後回到 0°）', demoMirrorOpen: '進入階段 6（轉到 170°）', demoMirrorClose: '離開階段 6（回到 0°）', demoAngle: '目前角度',
+  },
+  en: {
+    title: 'Inside the Headgear', loading: 'LOADING MODEL…', loadFail: 'Could not load the model. Please reload the page.',
+    explore: 'Explore', tour: 'How it works', explode: 'Explode', ghost: 'See-through shell', spin: 'Auto-rotate', reset: 'Reset view',
+    prev: '← Back', next: 'Next →',
+    stage: '3D model of the headgear. Drag to rotate, pinch to zoom', modes: 'View mode', track: 'Vertical explode amount', close: 'Close',
+    demoPower: 'Try sending servo values (0–100)', demoAuto: 'Auto', demoPowerNote: 'Numbers show "value sent → servo angle". 100 is 60°.',
+    demoImpact: 'Enter phase 6 (30° → back to 0° after 0.5 s)', demoMirrorOpen: 'Enter phase 6 (to 170°)', demoMirrorClose: 'Leave phase 6 (to 0°)', demoAngle: 'Current angle',
   },
 };
 const ZH_PARTS = {
-  case: { name: '電子零件外殼（上方圓頂）', desc: '戴在頭頂上的白色圓頂。裡面裝有 ESP32、伺服馬達驅動板、心跳感測器、距離感測器和解鎖用伺服馬達。後方的 2 個圓孔裝有 DC 插座，伺服馬達的線從下方的開口進入。',
-    spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['外形', '約 136 × 85 × 82 mm'], ['DC 插座', '後方 2 個（CAD 中沒有零件）']] },
-  esp32: { name: 'ESP32 開發板', sub: '控制・大腦',
-    desc: '頭戴裝置的大腦。透過 Wi‑Fi 連線到電腦，接收 OSC 訊息來驅動伺服馬達，並回傳心跳與距離的數值。通訊、伺服馬達與感測器的處理在 Core1 的任務中執行，停止 5 秒時看門狗會自動重新啟動。',
-    spec: [['通訊', 'Wi‑Fi + OSC（UDP 接收 9000／傳送 9003）'], ['I²C', 'PCA9685（0x40）・VL53L0X'], ['輸入', '心跳 GPIO25（中斷）'], ['指示燈', 'LED GPIO2（Wi‑Fi 連線中亮燈）'], ['穩定運作', '看門狗 5 秒／Wi‑Fi 自動重新連線']] },
+  case: { name: '電子零件外殼（上方圓頂）', desc: '戴在頭頂上的白色圓頂。裡面裝有 XIAO、伺服馬達驅動板、頭部衝擊用的伺服馬達、捲線器，以及心跳感測器用的插座。伺服馬達的線從下方進入外殼。',
+    spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['外形', '約 138 × 101 × 91 mm（含上蓋）']] },
+  xiao: { sub: '控制・大腦（Bluetooth LE）',
+    desc: '作為頭戴裝置大腦、拇指大小的微控制器板。透過 Bluetooth LE 與腦裝置連線，依照收到的階段和伺服數值驅動 8 個伺服馬達。把耳夾心跳感測器的心跳回傳給腦裝置，並透過線材（UART）指示椅子「傾倒・扶正」。',
+    spec: [['無線', 'Bluetooth LE（NozuiHeadgear-X1，由腦裝置主動連線）'], ['I²C', 'PCA9685（0x40，400 kHz）'], ['輸入', '心跳 D0（上升緣）'], ['椅子', 'UART D6（TX）／D7（RX）・9600 bps'], ['LED', '紅色閃爍：未連線／綠：連線中／藍：收到指令'], ['記錄', '運作記錄存在內建 2MB 快閃記憶體']] },
+  xiaocover: { name: 'XIAO 外蓋', desc: '覆蓋並固定 XIAO 的樹脂外蓋。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
   pca: { name: 'PCA9685 伺服馬達驅動板', sub: '統一控制 8 個伺服馬達',
-    desc: '透過 I²C 接收 ESP32 的指令，產生 16 通道 PWM 訊號的電路板。這個頭戴裝置使用其中 8 個通道（ch0〜3・ch12〜15），以 50Hz 的脈衝寬度決定伺服馬達的角度。各通道的脈衝起點稍微錯開，避免電流同時集中。',
-    spec: [['連接', 'I²C（位址 0x40）'], ['PWM', '50 Hz・脈衝寬度 0.5〜2.5 ms（0〜180°）'], ['使用通道', '伺服 #0〜3 → ch0〜3／#4〜7 → ch12〜15'], ['更新', '每 20 ms（只寫入角度有變化的通道）']] },
-  unlock: { name: 'SG90（解鎖）', sub: '輸出（/unlock）',
-    desc: '外殼內的小型伺服馬達。在階段 5 收到 /unlock 1 時轉到 30°，0.5 秒後自動回到 0°。',
+    desc: '透過 I²C 接收 XIAO 的指令，產生 16 通道 PWM 訊號的電路板。這個頭戴裝置使用其中 8 個通道（ch0〜3・ch12〜15），以 50Hz 的脈衝寬度決定伺服馬達的角度。',
+    spec: [['連接', 'I²C（位址 0x40）'], ['PWM', '50 Hz・脈衝寬度 0.5〜2.4 ms（MG90S）'], ['使用通道', '#0〜3 → ch0〜3／#4・5 → ch12・13／頭部衝擊 #6 → ch14／鏡子 #7 → ch15'], ['更新', '每個通道約 8 ms 輪流更新（6 通道約 50 ms）']] },
+  impact: { name: 'SG90（頭部衝擊）', sub: '輸出（階段 6）',
+    desc: '外殼內的小型伺服馬達。進入階段 6 的瞬間轉到 30°，0.5 秒後回到 0°。',
     spec: [['負責', '伺服 #6（ch14）'], ['動作', '0° → 30° → 0.5 秒後回到 0°'], ['角度上限', '35°']] },
-  heart: { name: '心跳感測器', sub: '輸入（GPIO25）',
-    desc: '偵測脈搏的感測器。ESP32 以中斷計算每一拍訊號的上升緣，在階段 3〜4 期間，每一拍傳送一次 /heartrate 1 給電腦。',
-    spec: [['連接', 'GPIO25（上升緣中斷）'], ['雜訊處理', '忽略小於 200 ms 的間隔（最高 300 bpm）'], ['剛啟動時', '前 10 拍不傳送'], ['傳送給電腦', '/heartrate 1（階段 3〜4）'], ['CAD 中的外形', 'MAX30100 模組']] },
-  tof: { name: 'VL53L0X 距離感測器', sub: '輸入（I²C）',
-    desc: '以雷射光往返時間測量距離的 ToF 感測器。位於外殼上方，在階段 3 期間每 100ms 讀取一次測量值，並每 50ms 以 /braindistance（mm）傳送給電腦。',
-    spec: [['連接', 'I²C（與 PCA9685 共用）'], ['測量', '連續測量 50 ms／每 100 ms 讀取'], ['傳送給電腦', '/braindistance（mm，每 50 ms・階段 3）'], ['失敗時', '無法初始化時，不使用距離繼續運作']] },
-  latch: { name: '彈簧・捲輪周邊', desc: '彈簧（spring）、捲輪的蓋子和線圈的蓋子。與外殼內的解鎖用伺服馬達搭配的部分。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
+  trrs: { name: '心跳感測器插座', sub: '輸入（D0）',
+    desc: '插入 Grove 耳夾心跳感測器的 4 極插座。感測器夾在耳垂上，XIAO 以 D0 計算每一拍訊號的上升緣。捨棄最初 10 拍後，每一拍都通知腦裝置（腦裝置在階段 3・4 時會產生心跳震動）。',
+    spec: [['感測器', 'Grove 耳夾心跳感測器（CAD 中沒有零件）'], ['連接', 'D0（上升緣）'], ['雜訊處理', '忽略距上一拍 350 ms 以內（超過 171 bpm）以及快於最近間隔 60% 的拍'], ['剛啟動', '最初 10 拍不傳送（每次進入階段 1 重新計算）'], ['傳給腦裝置', 'HEART 通知 [0x10][序號]']] },
+  reel: { name: '捲線器', desc: '外殼內的捲線器及其外蓋。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
   headmove: { name: '可動板', desc: '外殼下方的圓盤狀板子，位於外殼和頭帶之間。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
-  servos: { name: 'MG90S 伺服馬達 ×6', sub: '輸出（/power）',
-    desc: '頭帶左右各排列 3 個的金屬齒輪小型伺服馬達。依照電腦傳來的 /power 6 通道數值，改變擺臂（舵角）的角度。',
-    spec: [['負責', '伺服 #0〜5（ch0〜3・ch12〜13）'], ['角度', '/power 0〜100 → 0〜90°（每個伺服在 40° 封頂）'], ['動作時機', '階段 2〜4（進入階段 2 時回到 0°）'], ['方向', '每個伺服馬達可設定反轉']] },
+  servos: { name: 'MG90S 伺服馬達 ×6', sub: '輸出（壓力數值）',
+    desc: '頭帶左右各排列 3 個的金屬齒輪小型伺服馬達。依照腦裝置傳來的 6 通道數值（由壓力感測器換算而來），改變擺臂（舵角）的角度。',
+    spec: [['負責', '伺服 #0〜5（ch0〜3・ch12〜13）'], ['角度', '數值 0〜100 → 0〜60°'], ['動作時機', '階段 2（播放錄好的 15 秒動作）・階段 3/4（腦裝置每秒傳 20 次）'], ['停止時', '收到停止指令，或 1 秒沒收到數值：慢慢回到 0° 後放鬆'], ['方向', '每個伺服馬達可設定反轉']] },
   frame: { name: '頭帶框架', desc: '戴在頭上部分的骨架。左右的伺服馬達座上各固定 3 個 MG90S。', spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['零件', 'top／top_L／top_R／back_attach／front_attach／servomount ×6 等']] },
-  mirror: { name: 'SG90（鏡子）', sub: '輸出（/mirror）',
-    desc: '裝在前方支架上的小型伺服馬達。在階段 6 收到 /mirror 1 時花 2 秒轉到 170°，在階段 7 收到 /mirror 0 時花 2 秒回到 0°，動作平順。',
-    spec: [['負責', '伺服 #7（ch15）'], ['動作', '0° ⇄ 170°（以 2 秒等速轉動）'], ['階段', '6：轉到 170°／7：回到 0°']] },
+  mirrorrod: { name: '鏡子連桿', desc: '連接伺服馬達擺臂前端與鏡子底板右側凸出部的長桿。擺臂轉動時，會把底板拉起來。',
+    spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['連接位置', '擺臂前端 ⇄ 底板右側的凸出部']] },
+  mirrorplate: { name: '鏡子底板', desc: '放在前方地面上的板子，表面貼著鏡子。以後側的鉸鏈為支點，以伺服馬達約一半的角度立起。',
+    spec: [['材質', 'PLA Basic（白色）・3D 列印'], ['動作', '伺服馬達 170° 時約 85°']] },
+  mirror: { name: 'SG90（鏡子）', sub: '輸出（階段 6）',
+    desc: '裝在前方支架上的小型伺服馬達。透過連桿與鏡子底板相連，進入階段 6 時花 2 秒轉到 170°，離開階段 6 時花 2 秒回到 0°，動作平順。',
+    spec: [['負責', '伺服 #7（ch15）'], ['動作', '0° ⇄ 170°（以 2 秒等速轉動）'], ['階段', '進入 6：轉到 170°／離開 6：回到 0°']] },
   stand: { name: '支架', desc: '支撐頭戴裝置的底座。前方裝有鏡子用的伺服馬達。', spec: [['材質', 'PLA Basic（白色）・3D 列印']] },
   cables: { name: '伺服馬達線 ×8', sub: 'CAD 中沒有的配線',
-    desc: '每個伺服馬達的 3 條線（棕：GND・紅：電源・橙：訊號）沿著頭帶外側，從外殼後方的窗口進入，再以接頭插在 PCA9685 的針腳上。因為 CAD 中沒有包含，這是參考實物配線畫出的示意。',
-    spec: [['線的顏色', '棕 GND／紅 V+／橙 訊號'], ['連接位置', '伺服 #0〜3 → ch0〜3／#4〜7 → ch12〜15'], ['路徑', '頭帶外側 → 外殼後方的窗口 → PCA9685（只有外殼內的 SG90 走內側）']] },
+    desc: '每個伺服馬達的 3 條線（棕：GND・紅：電源・橙：訊號）沿著頭帶外側進入外殼，再以接頭插在 PCA9685 的針腳上。因為 CAD 中沒有包含，這是參考實物配線畫出的示意。',
+    spec: [['線的顏色', '棕 GND／紅 V+／橙 訊號'], ['連接位置', '伺服 #0〜3 → ch0〜3／#4〜7 → ch12〜15'], ['路徑', '頭帶外側 → 外殼後方 → PCA9685（只有外殼內的 SG90 走內側）']] },
 };
 const ZH_TOUR = [
-  { tab: '全體', title: '整體構成', flow: '電腦 ⇄ Wi‑Fi / OSC ⇄ ESP32 → PCA9685 → 伺服馬達 ×8',
-    text: 'ESP32 透過 Wi‑Fi 與電腦交換 OSC 訊息。電腦用 /phase 指定階段（1〜7），頭戴裝置依照階段驅動伺服馬達，或傳送心跳與距離的數值。8 個伺服馬達全部連接到名為 PCA9685 的伺服馬達驅動板。' },
-  { tab: '通訊', title: '與電腦的溝通（OSC）', flow: '電腦 → /phase /power /unlock /mirror /init /reboot ／ ESP32 → /ask /heartrate /braindistance',
-    text: '開機後連上 Wi‑Fi，並向電腦傳送 /ask。接收使用連接埠 9000，傳送使用 9003。Wi‑Fi 中斷時會自動重新連線，期間伺服馬達的動作與 OSC 接收也不會停止。處理停止 5 秒時看門狗會重新啟動，啟動時會再傳送一次 /ask。' },
-  { tab: '壓力', title: '輸出：用 /power 驅動 6 個伺服馬達', flow: '/power（6ch・0〜100）→ ESP32 → I²C → PCA9685 → MG90S ×6',
-    text: '在階段 2〜4 期間，把電腦傳來的 /power 6 通道數值（0〜100）轉換成伺服 #0〜5 的角度。數值會換算成 0〜90°，但每個伺服馬達都設有在 40° 停止的上限。格式與腦裝置傳送的 /power 相同，都是 6 通道。進入階段 2 時，6 個伺服馬達都會回到 0°。' },
-  { tab: '心跳', title: '輸入：心跳感測器', flow: '心跳感測器 → GPIO25（中斷）→ ESP32 → /heartrate',
-    text: 'ESP32 以中斷計算心跳感測器每一拍輸出訊號的上升緣。小於 200ms 的間隔視為雜訊忽略，剛啟動時的前 10 拍不傳送。在階段 3〜4 期間，每一拍傳送一次 /heartrate 1 給電腦。' },
-  { tab: '距離', title: '輸入：距離感測器（VL53L0X）', flow: 'VL53L0X → I²C → ESP32 → /braindistance（每 50ms）',
-    text: '外殼上方的 VL53L0X 以雷射光往返的時間測量距離。在階段 3 期間每 100ms 讀取一次測量值，並每 50ms 以 /braindistance（mm）傳送給電腦。感測器無法初始化時，會在沒有距離的情況下繼續運作。' },
-  { tab: '解鎖', title: '輸出：解鎖', flow: '/unlock 1 → PCA9685 ch14 → SG90 #6（30° → 0.5 秒後回到 0°）',
-    text: '在階段 5 收到 /unlock 1 時，外殼內的 SG90（伺服 #6）會轉到 30°，0.5 秒後自動回到 0°。' },
-  { tab: '鏡子', title: '輸出：鏡子', flow: '/mirror 1 → 170°（2 秒）／ /mirror 0 → 0°（2 秒）',
-    text: '在階段 6 收到 /mirror 1 時，前方的 SG90（伺服 #7）會花 2 秒轉到 170°。在階段 7 收到 /mirror 0 時，同樣花 2 秒回到 0°。角度每 20ms 更新一點，所以動作平順。' },
+  { tab: '全體', title: '整體構成', flow: '腦裝置 ⇄ BLE ⇄ XIAO → PCA9685 → 伺服馬達 ×8 ／ XIAO → UART → 椅子',
+    text: 'XIAO nRF52840 Sense 透過 Bluetooth LE 與腦裝置連線。從腦裝置接收階段和伺服數值，經由名為 PCA9685 的伺服馬達驅動板驅動 8 個伺服馬達。耳夾心跳感測器的心跳會回傳給腦裝置，在階段 6 時則指示椅子「傾倒」。' },
+  { tab: '通訊', title: '與腦裝置的溝通（BLE）', flow: '腦裝置 → 0x00 停止／0x01 階段 2／0x02 伺服數值／0x03 階段 ／ XIAO → 心跳',
+    text: '頭戴裝置以「NozuiHeadgear-X1」的名稱等待，由腦裝置主動連線。腦裝置會傳來 7 位元組的指令：0x00（停止並回到 0°）、0x01（播放階段 2 的動作）、0x02（6 個伺服馬達的數值）、0x03（目前的階段，每秒一次）。3 秒沒收到 0x03 就視為斷線，讓 6 個伺服馬達回到 0°。' },
+  { tab: '壓力', title: '輸出：驅動 6 個伺服馬達', flow: '0x02（6ch・0〜100）→ XIAO → I²C → PCA9685 → MG90S ×6',
+    text: '在階段 3・4 期間，腦裝置由壓力感測器換算的 6 通道數值（0〜100）每秒傳來 20 次，轉換成伺服 #0〜5 的角度（0〜60°）。在階段 2 會播放一次錄好的 15 秒動作。1 秒沒收到數值或收到停止指令時，會慢慢回到 0° 並放鬆。' },
+  { tab: '心跳', title: '輸入：心跳感測器', flow: '耳夾心跳感測器 → 插座 → D0 → XIAO → BLE → 腦裝置',
+    text: 'XIAO 以 D0 計算夾在耳垂上的心跳感測器每一拍輸出訊號的上升緣。350ms 以內、或快於最近間隔 60% 的拍會視為重複偵測而忽略，最初 10 拍也不傳送。之後每一拍都通知腦裝置，腦裝置在階段 3・4 時產生心跳震動。' },
+  { tab: '衝擊', title: '輸出：頭部衝擊（階段 6）', flow: '進入階段 6 → PCA9685 ch14 → SG90 #6（30° → 0.5 秒後回到 0°）',
+    text: '進入階段 6 的瞬間，外殼內的 SG90（伺服 #6）會轉到 30°，0.5 秒後回到 0°。剛啟動或斷線後等不知道前一個階段的情況下變成階段 6 時，不會動作。' },
+  { tab: '鏡子', title: '輸出：鏡子（階段 6）', flow: '進入階段 6 → 170°（2 秒）／離開 → 0°（2 秒）',
+    text: '進入階段 6 時，前方的 SG90（伺服 #7）會花 2 秒轉到 170°。擺臂前端與鏡子底板以連桿相連，連桿把底板拉起，貼著鏡子的底板會立起到約 85°。離開階段 6 時，同樣花 2 秒回到 0° 並放鬆。' },
+  { tab: '椅子', title: '輸出：椅子（UART）', flow: 'XIAO D6／D7 ⇄ UART 9600 bps ⇄ 椅子（M5Atom）',
+    text: '與椅子以線材連接，交換 4 位元組的電文 [0xA5][種類][數值][檢查碼]。進入階段 6 時送「傾倒」，離開時送「扶正」，為了即使壞掉一則也能送達，每次送 3 遍。每 0.2 秒傳送目前階段作為訊號，椅子則回傳傾斜狀態。' },
 ];
-// 繁體中文 first. Every visit opens in it and the idle reset returns to it, so one visitor's
+const EN_PARTS = {
+  case: { name: 'Electronics case (top dome)', desc: 'The white dome that sits on top of the head. It holds the XIAO, the servo driver, the head-impact servo, the reel and the jack for the heart-rate sensor. The servo leads enter the case from below.',
+    spec: [['Material', 'PLA Basic (white), 3D-printed'], ['Size', 'approx. 138 × 101 × 91 mm (with lid)']] },
+  xiao: { sub: 'Controller · the brain (Bluetooth LE)',
+    desc: 'A thumb-sized microcontroller board that is the headgear\'s brain. It connects to the brain device over Bluetooth LE and drives the eight servos to the phase and servo values it receives. It sends the ear-clip heart-rate sensor\'s beats back to the brain device, and tells the chair to tilt back or sit up over a cable (UART).',
+    spec: [['Radio', 'Bluetooth LE (NozuiHeadgear-X1; the brain device connects to it)'], ['I²C', 'PCA9685 (0x40, 400 kHz)'], ['Input', 'heartbeat D0 (rising edge)'], ['Chair', 'UART D6 (TX) / D7 (RX), 9600 bps'], ['LED', 'Red blink: not connected / green: connected / blue: command received'], ['Log', 'activity log kept in the built-in 2 MB flash']] },
+  xiaocover: { name: 'XIAO cover', desc: 'The resin cover that holds the XIAO in place.', spec: [['Material', 'PLA Basic (white), 3D-printed']] },
+  pca: { name: 'PCA9685 servo driver', sub: 'Drives all 8 servos',
+    desc: 'A board that takes orders from the XIAO over I²C and generates 16 channels of PWM. This headgear uses 8 of them (ch0–3, ch12–15) and sets each servo\'s angle by the pulse width at 50 Hz.',
+    spec: [['Bus', 'I²C (address 0x40)'], ['PWM', '50 Hz, pulse 0.5–2.4 ms (MG90S)'], ['Channels', '#0–3 → ch0–3 / #4 · 5 → ch12 · 13 / head impact #6 → ch14 / mirror #7 → ch15'], ['Update', 'one channel about every 8 ms (about 50 ms for 6 ch)']] },
+  impact: { name: 'SG90 (head impact)', sub: 'Output (phase 6)',
+    desc: 'A small servo inside the case. The moment phase 6 begins it turns to 30°, and after 0.5 s it returns to 0°.',
+    spec: [['Servo', '#6 (ch14)'], ['Motion', '0° → 30° → back to 0° after 0.5 s'], ['Angle limit', '35°']] },
+  trrs: { name: 'Heart-rate sensor jack', sub: 'Input (D0)',
+    desc: 'A 4-pole jack for the Grove ear-clip heart-rate sensor. The sensor clips onto the earlobe, and the XIAO counts the rising edge of each beat on D0. After dropping the first 10 beats, it reports every beat to the brain device (which plays the heartbeat vibration in phases 3 and 4).',
+    spec: [['Sensor', 'Grove ear-clip heart-rate sensor (not in the CAD)'], ['Wiring', 'D0 (rising edge)'], ['Noise filter', 'ignores beats within 350 ms of the last (over 171 bpm) and faster than 60 % of the recent interval'], ['At start', 'the first 10 beats are not sent (counted again at every phase 1)'], ['To the brain device', 'HEART notification [0x10][sequence no.]']] },
+  reel: { name: 'Reel', desc: 'The reel inside the case and its cover.', spec: [['Material', 'PLA Basic (white), 3D-printed']] },
+  headmove: { name: 'Moving plate', desc: 'The disc-shaped plate under the case, between the case and the headband.', spec: [['Material', 'PLA Basic (white), 3D-printed']] },
+  servos: { name: 'MG90S servos ×6', sub: 'Output (pressure values)',
+    desc: 'Small metal-gear servos, three on each side of the headband. They set their arm (horn) angles to the 6-channel values the brain device sends (made from its pressure sensors).',
+    spec: [['Servos', '#0–5 (ch0–3, ch12–13)'], ['Angle', 'value 0–100 → 0–60°'], ['When', 'phase 2 (a recorded 15 s motion) · phases 3/4 (20 times a second from the brain device)'], ['Stopping', 'on a stop command or when no value arrives for 1 s: back to 0° slowly, then relaxed'], ['Direction', 'each servo can be set to turn the other way']] },
+  frame: { name: 'Headband frame', desc: 'The frame you put on your head. Three MG90S servos are fixed to the servo mounts on each side.', spec: [['Material', 'PLA Basic (white), 3D-printed'], ['Parts', 'top / top_L / top_R / back_attach / front_attach / servomount ×6 and more']] },
+  mirrorrod: { name: 'Mirror rod', desc: 'The long rod linking the tip of the servo arm to the tab on the right side of the mirror plate. As the arm turns, it pulls the plate up.',
+    spec: [['Material', 'PLA Basic (white), 3D-printed'], ['Connects', 'servo arm tip ⇄ tab on the right of the plate']] },
+  mirrorplate: { name: 'Mirror plate', desc: 'The board lying on the floor in front, with the mirror stuck to its face. It rises about its back hinge by about half the servo angle.',
+    spec: [['Material', 'PLA Basic (white), 3D-printed'], ['Motion', 'about 85° at servo 170°']] },
+  mirror: { name: 'SG90 (mirror)', sub: 'Output (phase 6)',
+    desc: 'A small servo on the stand in front. It is linked to the mirror plate by the rod: when phase 6 begins it turns smoothly to 170° over 2 s, and when phase 6 ends it turns back to 0° over 2 s.',
+    spec: [['Servo', '#7 (ch15)'], ['Motion', '0° ⇄ 170° (at a steady speed over 2 s)'], ['Phase', 'into 6: to 170° / out of 6: back to 0°']] },
+  stand: { name: 'Stand', desc: 'The stand that holds the headgear. The mirror servo is mounted at its front.', spec: [['Material', 'PLA Basic (white), 3D-printed']] },
+  cables: { name: 'Servo leads ×8', sub: 'Wiring not in the CAD',
+    desc: 'Each servo\'s three wires (brown: GND, red: power, orange: signal) run along the outside of the headband into the case and plug into the PCA9685\'s pins. They are not in the CAD, so this is a drawing based on the real wiring.',
+    spec: [['Wire colours', 'brown GND / red V+ / orange signal'], ['Goes to', 'servos #0–3 → ch0–3 / #4–7 → ch12–15'], ['Route', 'outside of the headband → back of the case → PCA9685 (only the SG90 in the case runs inside)']] },
+};
+const EN_TOUR = [
+  { tab: 'Overview', title: 'How it fits together', flow: 'Brain device ⇄ BLE ⇄ XIAO → PCA9685 → servos ×8 ／ XIAO → UART → chair',
+    text: 'The XIAO nRF52840 Sense connects to the brain device over Bluetooth LE. It gets the phase and the servo values from the brain device and drives eight servos through a servo driver called the PCA9685. It sends the ear-clip heart-rate sensor\'s beats back to the brain device, and in phase 6 it tells the chair to tilt back.' },
+  { tab: 'Link', title: 'Talking to the brain device (BLE)', flow: 'Brain device → 0x00 stop / 0x01 phase 2 / 0x02 servo values / 0x03 phase ／ XIAO → heartbeat',
+    text: 'The headgear waits under the name "NozuiHeadgear-X1" and the brain device connects to it. The brain device sends 7-byte commands: 0x00 (stop and go to 0°), 0x01 (play the phase 2 motion), 0x02 (values for the six servos) and 0x03 (the current phase, once a second). If no 0x03 arrives for 3 s it treats the link as lost and returns the six servos to 0°.' },
+  { tab: 'Pressure', title: 'Output: moving the six servos', flow: '0x02 (6 ch, 0–100) → XIAO → I²C → PCA9685 → MG90S ×6',
+    text: 'In phases 3 and 4, the 6-channel values (0–100) the brain device makes from its pressure sensors arrive 20 times a second and become the angles (0–60°) of servos #0–5. In phase 2 it plays a recorded 15-second motion once. When no value arrives for 1 s or a stop command comes, the servos slowly return to 0° and relax.' },
+  { tab: 'Heartbeat', title: 'Input: heart-rate sensor', flow: 'Ear-clip heart-rate sensor → jack → D0 → XIAO → BLE → brain device',
+    text: 'The XIAO counts, on D0, the rising edge of each beat from the heart-rate sensor clipped to the earlobe. Beats within 350 ms, or faster than 60 % of the recent interval, are dropped as double counts, and the first 10 beats are not sent. After that every beat is reported to the brain device, which plays the heartbeat vibration in phases 3 and 4.' },
+  { tab: 'Impact', title: 'Output: head impact (phase 6)', flow: 'Into phase 6 → PCA9685 ch14 → SG90 #6 (30° → back to 0° after 0.5 s)',
+    text: 'The moment phase 6 begins, the SG90 inside the case (servo #6) turns to 30° and returns to 0° after 0.5 s. It does not move when phase 6 arrives without a known previous phase, such as right after start-up or after the link was lost.' },
+  { tab: 'Mirror', title: 'Output: mirror (phase 6)', flow: 'Into phase 6 → 170° (2 s) ／ out → 0° (2 s)',
+    text: 'When phase 6 begins, the SG90 at the front (servo #7) turns to 170° over 2 s. The arm tip and the mirror plate are linked by the rod, which pulls the plate up until the mirror stands at about 85°. When phase 6 ends, it turns back to 0° over 2 s and relaxes.' },
+  { tab: 'Chair', title: 'Output: chair (UART)', flow: 'XIAO D6 / D7 ⇄ UART 9600 bps ⇄ chair (M5Atom)',
+    text: 'The headgear is wired to the chair and exchanges 4-byte messages [0xA5][type][value][check]. When phase 6 begins it sends "tilt back", and when it ends "sit up" — three times each, so they get through even if one message is garbled. Every 0.2 s it sends the current phase as a heartbeat signal, and the chair reports its tilt back.' },
+];
+// English first. Every visit opens in it and the idle reset returns to it, so one visitor's
 // choice does not carry over to the next (nothing is stored).
-let LANG = 'zh';
+let LANG = 'en';
 const ui = (k) => UI[LANG][k];
-const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
-const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
+const L10N = { zh: { parts: ZH_PARTS, tour: ZH_TOUR }, en: { parts: EN_PARTS, tour: EN_TOUR } };  // Japanese is the base text
+const P = (p, k) => (L10N[LANG] && L10N[LANG].parts[p.id] && L10N[LANG].parts[p.id][k]) || p[k];
+const T = (i, k) => (L10N[LANG] && L10N[LANG].tour[i][k]) || TOUR[i][k];
 
 
 // ---------- Renderer / scene ----------
@@ -699,7 +766,7 @@ function onModel(gltf) {
     p.objs = [];
     const box = new THREE.Box3();
     // One draw call per surface finish: every face of the part with the same finish is merged
-    // (the ESP32 board's ~900 solids become a handful of meshes). Looks the same, far fewer draws.
+    // (the PCA9685 board.s ~300 solids become a handful of meshes). Looks the same, far fewer draws.
     const byFinish = new Map();
     const over = p.finish;
     const horns = p.horns ? p.srcs.filter((m) => HORNS[p.horns].parts.test(pathOf(m))) : [];
@@ -744,6 +811,7 @@ function onModel(gltf) {
     }
   }
   buildServos();
+  buildMirrorLink();
   computeRises();
   S.shadowDirty = true;
   document.getElementById('loading').hidden = true;
@@ -753,14 +821,15 @@ function onModel(gltf) {
 
 // ---------- Servos #0–7: numbering, moving horns, cables (not in the CAD) ----------
 // Numbering is ours (the sketch only fixes the channels), chosen so no two leads cross: right
-// MG90S front→back = #0–2, left MG90S front→back = #3–5, the SG90 in the case = #6 (unlock), the
-// SG90 on the stand = #7 (mirror). Channels follow writeServo(): #0–3 → ch0–3, #4–7 → ch12–15;
+// MG90S front→back = #0–2, left MG90S front→back = #3–5, the SG90 in the case = #6 (head impact),
+// the SG90 on the stand = #7 (mirror). Each unit keeps its number in .i; sv(n) finds one by number. Channels follow writeServo(): #0–3 → ch0–3, #4–7 → ch12–15;
 // ch0 is taken as the header's +x end.
-const SERVO_MAX = [40, 40, 40, 40, 40, 40, 35, 170];               // servoMaxAngle[]
+const SERVO_MAX = [60, 60, 60, 60, 60, 60, 35, 170];               // SERVO_ANGLE_MAX / IMPACT_MAX_DEG / MIRROR_MAX_DEG
 const SERVO_REV = [false, false, true, true, true, false, true, true];  // servoReverse[]
 const SERVO_CH = [0, 1, 2, 3, 12, 13, 14, 15];
 const SERVO_SPEED = 600;  // °/s, MG90S / SG90 ≈ 0.1 s per 60°
 const servos = [];
+const sv = (n) => servos.find((s) => s.i === n);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const unitKey = (m) => m.userData.path.split('/')[0];  // "M90S_ali#3", "[4145] … Sg90#1"
 
@@ -864,11 +933,57 @@ function buildServos() {
   const mg = [...groups].map(([key, srcs]) => ({ key, srcs, part: byId.servos, lead: servoLead(srcs) }));
   const side = (s) => mg.filter((u) => Math.sign(u.lead.end.x) === s).sort((a, b) => a.lead.end.y - b.lead.end.y);
   const sg = (part) => ({ key: unitKey(part.srcs[0]), srcs: part.srcs, part, lead: servoLead(part.srcs) });
-  [...side(1), ...side(-1), sg(byId.unlock), sg(byId.mirror)].forEach((u, i) => {
+  [...[...side(1), ...side(-1)].map((u, i) => ({ ...u, i })), { ...sg(byId.impact), i: 6 }, { ...sg(byId.mirror), i: 7 }].forEach((u) => {
     const h = u.part.hornUnits[u.key];
-    servos.push({ ...u, i, ch: SERVO_CH[i], pivot: h.pivot, axis: h.axis, angle: 0, target: 0 });
+    servos.push({ ...u, ch: SERVO_CH[u.i], pivot: h.pivot, axis: h.axis, angle: 0, target: 0 });
   });
   buildCables();
+}
+// Mirror linkage: the rod hangs from the tip of the stand SG90's long horn arm and pulls up the tab on
+// the right side of the mirror plate ("ボディ112", hinged at its back edge). On the real stand the
+// mirror rises about half the servo angle (170° → 85°). The CAD's rod is too long for that geometry,
+// so it is drawn from the horn tip to the tab and stretched along its length to fit (≈ 68–81 mm).
+const MIRROR_LINK = {
+  hinge: { y: -71.75, z: 10.25 },   // the plate's back knuckles
+  tab: { y: -108.55, z: 10.25 },    // pin on the plate's right-side tab
+  tip: { r: 16.4, deg: -91.1 },     // hole at the tip of the horn's long arm, from the servo axis
+  rod: { top: { y: -70.54, z: 89.33 }, bottom: { y: -107.53, z: 9.2 } },  // the rod's pins as drawn in the CAD
+  ratio: 85 / 170,                  // mirror angle per servo angle
+};
+function buildMirrorLink() {
+  const s = sv(7), rod = byId.mirrorrod.objs, plate = byId.mirrorplate.objs;
+  if (!s || !rod.length || !plate.length) return;
+  const L = MIRROR_LINK, C = s.pivot.position.clone(), x = C.x, rad = THREE.MathUtils.degToRad;
+  const u0 = V(0, L.tip.r * Math.cos(rad(L.tip.deg)), L.tip.r * Math.sin(rad(L.tip.deg)));
+  const H = V(x, L.hinge.y, L.hinge.z), P0 = V(x, L.tab.y, L.tab.z).sub(H);
+  const R0 = V(x, L.rod.top.y, L.rod.top.z), d0 = V(x, L.rod.bottom.y, L.rod.bottom.z).sub(R0);
+  const len0 = d0.length(); d0.normalize();
+  // the shaft axis's sign from the CAD is arbitrary: the servo's positive turn swings the tip forwards
+  const q = new THREE.Quaternion().setFromAxisAngle(s.axis, 0.1 * (SERVO_REV[7] ? -1 : 1));
+  if (u0.clone().applyQuaternion(q).y > u0.y) s.axis.negate();
+  const X = V(1, 0, 0), pq = new THREE.Quaternion(), rq = new THREE.Quaternion(), T = V(), B = V(), d = V(), h = V();
+  const M = new THREE.Matrix4(), S = new THREE.Matrix4(), W = new THREE.Matrix4();
+  for (const o of [...rod, ...plate]) o.matrixAutoUpdate = false;
+  s.linkObjs = [...rod, ...plate];
+  s.link = (rot) => {
+    // plate: front edge up by ratio × the servo angle, about the hinge
+    pq.setFromAxisAngle(X, -rad(s.angle * L.ratio));
+    h.copy(H).applyQuaternion(pq);
+    M.makeRotationFromQuaternion(pq).setPosition(H.x - h.x, H.y - h.y, H.z - h.z);
+    for (const o of plate) o.matrix.copy(M);
+    // rod: top pin on the horn tip, bottom pin on the tab (stretched along its length to fit)
+    T.copy(u0).applyQuaternion(rot).add(C);
+    B.copy(P0).applyQuaternion(pq).add(H);
+    d.copy(B).sub(T);
+    const k = d.length() / len0 - 1; d.normalize();
+    S.set(1 + k * d0.x * d0.x, k * d0.x * d0.y, k * d0.x * d0.z, 0,
+      k * d0.y * d0.x, 1 + k * d0.y * d0.y, k * d0.y * d0.z, 0,
+      k * d0.z * d0.x, k * d0.z * d0.y, 1 + k * d0.z * d0.z, 0, 0, 0, 0, 1);
+    rq.setFromUnitVectors(d0, d);
+    W.makeTranslation(-R0.x, -R0.y, -R0.z).premultiply(S).premultiply(M.makeRotationFromQuaternion(rq)).premultiply(new THREE.Matrix4().makeTranslation(T.x, T.y, T.z));
+    for (const o of rod) o.matrix.copy(W);
+  };
+  s.link(s.pivot.quaternion);
 }
 function buildCables() {
   const p = byId.cables, { tip, n } = headerPins(byId.pca.srcs);
@@ -963,25 +1078,25 @@ function updateCables(t) {
 
 // ----- moving the horns like the sketch does -----
 // target = the angle the sketch writes; the horn then turns towards it at servo speed.
-const demo = { power: [0, 0, 0, 0, 0, 0], auto: false, unlockAt: 0, mirror: null };
+const demo = { power: [0, 0, 0, 0, 0, 0], auto: false, impactAt: 0, mirror: null };
 function resetServos() {
-  demo.power.fill(0); demo.auto = false; demo.unlockAt = 0; demo.mirror = null;
+  demo.power.fill(0); demo.auto = false; demo.impactAt = 0; demo.mirror = null;
   for (const s of servos) s.target = 0;
 }
-function setPower(i, v) {  // handlePower(): 0–100 -> 0–90°, then capped at servoMaxAngle
+function setPower(i, v) {  // servoWrite(): value 0–100 -> 0–SERVO_ANGLE_MAX°
   demo.power[i] = v;
-  servos[i].target = Math.min(v / 100 * 90, SERVO_MAX[i]);
+  sv(i).target = v / 100 * SERVO_MAX[i];
 }
-function sendUnlock() { servos[6].target = 30; demo.unlockAt = performance.now(); }       // handleUnlock()
-function sendMirror(open) {                                                              // handleMirror()
-  demo.mirror = { from: servos[7].target, to: open ? 170 : 0, at: performance.now() };
+function sendImpact() { sv(6).target = 30; demo.impactAt = performance.now(); }  // impactStart(): IMPACT_HIT_DEG
+function sendMirror(open) {                                    // Phase 6 in / out: mirrorMoveTo()
+  demo.mirror = { from: sv(7).target, to: open ? 170 : 0, at: performance.now() };
 }
 function updateServos(now, dt) {
   if (demo.auto) for (let i = 0; i < 6; i++) setPower(i, Math.round(50 + 50 * Math.sin(now * 0.0016 + i * 1.05)));
-  if (demo.unlockAt && now - demo.unlockAt >= 500) { servos[6].target = 0; demo.unlockAt = 0; }  // UNLOCK_HOLD_TIME
+  if (demo.impactAt && now - demo.impactAt >= 500) { sv(6).target = 0; demo.impactAt = 0; }  // IMPACT_HOLD_MS
   if (demo.mirror) {                                                                      // MIRROR_DURATION
     const k = Math.min(1, (now - demo.mirror.at) / 2000);
-    servos[7].target = demo.mirror.from + (demo.mirror.to - demo.mirror.from) * k;
+    sv(7).target = demo.mirror.from + (demo.mirror.to - demo.mirror.from) * k;
     if (k >= 1) demo.mirror = null;
   }
   let moved = false;
@@ -990,6 +1105,7 @@ function updateServos(now, dt) {
     if (Math.abs(d) < 0.01) continue;
     s.angle += Math.sign(d) * Math.min(Math.abs(d), SERVO_SPEED * dt);
     s.pivot.quaternion.setFromAxisAngle(s.axis, THREE.MathUtils.degToRad(s.angle) * (SERVO_REV[s.i] ? -1 : 1));
+    if (s.link) s.link(s.pivot.quaternion);
     moved = true;
   }
   if (moved) S.hornsMoved = true;  // shadows: see hornShadow
@@ -1264,9 +1380,9 @@ function renderDemo() {
     for (let i = 0; i < 6; i++) document.getElementById('demo-pw' + i).addEventListener('input', (e) => {
       demo.auto = false; document.getElementById('demo-auto').setAttribute('aria-pressed', false); setPower(i, +e.target.value);
     });
-  } else if (kind === 'unlock') {
-    demoEl.innerHTML = `<div class="buttons"><button class="send" id="demo-unlock">${ui('demoUnlock')}</button></div><span class="note" id="demo-state"></span>`;
-    document.getElementById('demo-unlock').addEventListener('click', sendUnlock);
+  } else if (kind === 'impact') {
+    demoEl.innerHTML = `<div class="buttons"><button class="send" id="demo-impact">${ui('demoImpact')}</button></div><span class="note" id="demo-state"></span>`;
+    document.getElementById('demo-impact').addEventListener('click', sendImpact);
   } else if (kind === 'mirror') {
     demoEl.innerHTML = `<div class="buttons"><button class="send" id="demo-open">${ui('demoMirrorOpen')}</button><button class="send secondary" id="demo-close">${ui('demoMirrorClose')}</button></div><span class="note" id="demo-state"></span>`;
     document.getElementById('demo-open').addEventListener('click', () => sendMirror(true));
@@ -1284,10 +1400,10 @@ function syncDemo(time) {
     const r = document.getElementById('demo-pw' + i), o = document.getElementById('demo-out' + i);
     if (!r) return;
     if (demo.auto) r.value = demo.power[i];
-    o.textContent = `${demo.power[i]} → ${Math.round(servos[i].angle)}°`;
+    o.textContent = `${demo.power[i]} → ${Math.round(sv(i).angle)}°`;
   } else {
-    const st = document.getElementById('demo-state'), sv = servos[kind === 'unlock' ? 6 : 7];
-    if (st) st.textContent = `${ui('demoAngle')} ${Math.round(sv.angle)}°`;
+    const st = document.getElementById('demo-state'), m = sv(kind === 'impact' ? 6 : 7);
+    if (st) st.textContent = `${ui('demoAngle')} ${Math.round(m.angle)}°`;
   }
 }
 function renderTourText() {
@@ -1321,9 +1437,8 @@ function goStep(i) {
 // Language switch: re-renders every text in place (keeps view, step and explode as they are)
 function setLang(l) {
   LANG = l;
-  document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
-  document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
-  document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
+  document.documentElement.lang = { ja: 'ja', zh: 'zh-Hant', en: 'en' }[l];
+  for (const k of ['en', 'ja', 'zh']) document.getElementById('lang-' + k).setAttribute('aria-pressed', l === k);
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     if (el.id === 'loading' && el.hidden) return;
     el.textContent = ui(el.dataset.i18n);
@@ -1334,6 +1449,7 @@ function setLang(l) {
   if (S.selected) renderSheet(S.selected);
   if (callouts.length) layoutCallouts();
 }
+document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
 document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
 document.getElementById('lang-zh').addEventListener('click', () => setLang('zh'));
 setLang(LANG);
@@ -1584,7 +1700,7 @@ const hornShadow = (() => {
   copy.frustumCulled = false;
   const copyScene = new THREE.Scene().add(copy), copyCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   let ready = false;
-  const horns = () => new Set(servos.flatMap((s) => s.pivot.children.filter((o) => o.isMesh)));
+  const horns = () => new Set(servos.flatMap((s) => [...s.pivot.children.filter((o) => o.isMesh), ...(s.linkObjs || [])]));
   // draw only the meshes `keep` accepts (shadow casters), the rest hidden for the pass
   function pass(target, material, keep, clear) {
     const hidden = [];
@@ -1759,7 +1875,7 @@ function backToStart() {
   pulse = null;
   if (S.mode !== 'explore') setMode('explore');
   select(null);
-  if (LANG !== 'zh') setLang('zh');
+  if (LANG !== 'en') setLang('en');
   const ghost = document.getElementById('t-ghost'), spin = document.getElementById('t-spin');
   if (ghost.getAttribute('aria-pressed') === 'true') ghost.click();
   if (spin.getAttribute('aria-pressed') !== 'true') spin.click();

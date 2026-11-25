@@ -1,11 +1,11 @@
 # 脳デバイス 3Dビューア — 引き継ぎメモ
 
-脳デバイス（M5StickS3製）のSTEPモデルを、iPadで回転・高さ方向に分解しながら観察できるWebアプリ。
+脳デバイス（SIGGRAPH版：XIAO nRF52840 Sense製）のSTEPモデルを、iPadで回転・高さ方向に分解しながら観察できるWebアプリ。
 デバイス本体は、塗装した超軟質ウレタンゲルの「脳」の中に収まっている。
-「しくみ」モードでは、ファームウェア（`brain_m5sticks3` v3.9）の動きに沿って信号の流れを7ステップで説明する。
+「しくみ」モードでは、ファームウェア（`NozuiBrain_SIGGRAPH.ino`）の動きに沿って信号の流れを7ステップで説明する。
 
 - 公開中（Claude Artifact・非公開リンク）：https://claude.ai/artifact/WoLULHZCEYWqHDiaMPRuN3
-- 最終更新：2026-10-08（Artifact バージョン18）
+- 最終更新：2026-11-24（中身を SIGGRAPH 版に差し替え。Artifact は未更新：最後に公開したのは 2026-10-08 のバージョン18）
 - 別デバイス「ヘッドギア」のビューアも同じ仕組みで `headgear/` にあります（§8）。
 
 ---
@@ -20,14 +20,20 @@
 ├─ build-standalone.js       app/ → dist/（どこでも動く単体版を作る）
 ├─ step-mesh.py              変換 1/3: STEP → raw.json（メッシュ化。Python + OpenCascade）
 ├─ step-colors.js            変換 2/3: STEP → step-colors.json（色の抽出）
+├─ add-parts.js              変換 2.5: 脳ジェル＋底面カバー（source/gel.json）を足し、電池の仮の板を LiPo（source/battery-602535.json）に差し替える
 ├─ to-glb.js                 変換 3/3: → app/model.glb + app/model.json
 ├─ app/
 │   ├─ index.html            アプリ本体（HTML・CSS・JS 全部この1ファイル）
 │   ├─ model.json            3Dモデル（GLBをbase64でJSONに包んだもの）← アプリが読むのはこれ
 │   └─ model.glb             同じモデルのGLB（Blender等で開く用）
 ├─ source/
-│   ├─ brain device2.step    元のCADデータ（Fusion 360 から書き出し、脳・底面カバー・圧力センサー4枚入り）
-│   └─ brain_m5sticks3_v35.ino  マイコンのスケッチ（v3.9）※Wi‑Fiのパスワードを含むので公開しない
+│   ├─ brain device2(siggraph2).step  今のCADデータ（SIGGRAPH版の本体のみ。脳ジェルは入っていない）
+│   ├─ gel.json             脳ジェル＋底面カバーのメッシュ（旧STEPから切り出したもの。add-parts.js が使う）
+│   ├─ battery-602535.json  LiPo 602535 のメッシュ（603040.STEP を 25×35mm に縮めて配置済み。archive/scripts/make-battery.js で作成）
+│   ├─ 603040.STEP / .SLDPRT  LiPo の元モデル（SolidWorks。色は SLDPRT を参照）
+│   ├─ NozuiBrain_SIGGRAPH.ino  今のマイコンのスケッチ（XIAO nRF52840 Sense、BLE）
+│   ├─ brain device2.step    旧CADデータ（M5StickS3版、脳・底面カバー入り。gel.json の元）
+│   └─ brain_m5sticks3_v35.ino  旧スケッチ（M5StickS3 v3.9）※Wi‑Fiのパスワードを含むので公開しない
 ├─ archive/
 │   ├─ model-v1/             旧モデル（脳なし・97ソリッド）の STEP / GLB / JSON
 │   ├─ model-v2/             旧モデル（脳あり・圧力センサーなし・131ソリッド、Artifact v15）
@@ -65,8 +71,8 @@ node serve.js dist 5174
 
 ```bash
 pip install cadquery-ocp   # 初回だけ（ネイティブ版 OpenCascade、約600MB）。venv 推奨
-# source/brain device2.step を差し替えてから
-npm run convert            # python step-mesh.py → step-colors.js → to-glb.js
+# source/brain device2(siggraph2).step を差し替えてから
+npm run convert            # python step-mesh.py → step-colors.js → add-parts.js → to-glb.js
 ```
 
 部品は「CADの組立ツリー上の名前」で拾うので、STEPに部品が増えても既存部品の対応は崩れません（§4）。
@@ -75,6 +81,10 @@ npm run convert            # python step-mesh.py → step-colors.js → to-glb.j
 ---
 
 ## 3. 変換パイプライン（STEP → Web）
+
+**SIGGRAPH版（2026-11-24〜）**：新しいSTEPには本体しか入っていないので、脳ジェルと底面カバーは旧STEP（`source/brain device2.step`）からメッシュ化したものを `source/gel.json` に保存し、`add-parts.js` で毎回足しています。本体のCAD座標は旧版と同じなので、外装に対する本体の位置は前回と同じ（`shift` もそのまま）。
+STEPに色が入っていないため、シェル・アームは以前と同じ濃いグレー（`3f3f3f`）を `to-glb.config.json` の `recolor` で付けています。
+to-glb.js は、面の数が同じソリッドがほかにない場合も「確実な対応」として扱い、名前（siggraph_shell・brain_cover など）をパスに使います。
 
 1. **step-mesh.py**：ネイティブ版 OpenCascade（`cadquery-ocp`）で STEP を三角形メッシュにします。出力 `raw.json` は以前の occt-import-js と同じ形式。
    - **色も XCAF から直接読みます**（ソリッドの色と面ごとの色。インスタンスの色 → 部品の色 → 親の色の順で優先）。
@@ -107,13 +117,13 @@ npm run convert            # python step-mesh.py → step-colors.js → to-glb.j
 
 | 名前 | 内容 |
 |---|---|
-| `PARTS` | 部品の一覧。主な項目は次の通り。<br>・`sel`：組立パスの正規表現（m5 は最後に判定するので、中のネジ・ソケットは各部品に入る）<br>・`layer`：パーツ群の中での分解の段数<br>・`stack: 'brain' / 'cover' / 'shell' / 'sensors' / 'arms'`<br>・`finish`：質感の上書き（`'gel'` か material の値）<br>・`paint`：ジェルの塗装モード<br>・`anchor: 'one'`：触れ合うメッシュを1個ずつの塊（`units`）にまとめる。引き出し線の点は右端の1枚に付け、しくみの信号線は塊ごとに1本ずつ出す（圧力センサー4枚 → 4本）<br>・`showFrom`：分解量がこの mm に達するまで非表示（圧力センサーのピン：100）<br>・`callout`：引き出し線を付ける<br>・名前・説明・仕様 |
+| `PARTS` | 部品の一覧。主な項目は次の通り。<br>・`sel`：組立パスの正規表現（上から順に判定し、最初に当てはまった部品に入る）<br>・`layer`：パーツ群の中での分解の段数<br>・`stack: 'brain' / 'cover' / 'shell' / 'sensors' / 'arms'`<br>・`finish`：質感の上書き（`'gel'` か material の値）<br>・`paint`：ジェルの塗装モード<br>・`anchor: 'one'`：触れ合うメッシュを1個ずつの塊（`units`）にまとめる。引き出し線の点は右端の1枚に付け、しくみの信号線は塊ごとに1本ずつ出す（圧力センサー4枚 → 4本）<br>・`showFrom`：分解量がこの mm に達するまで非表示（圧力センサーのピン：100）<br>・`callout`：引き出し線を付ける<br>・名前・説明・仕様 |
 | `GROUP_SPLIT = 0.35` | 分解スライダーのうち、1段目（3つに分かれる）に使う割合 |
 | `LAYER_GAP = 12` / `CLEARANCE = 8` / `COVER_LIFT = 10` | 段の間隔 / グループ間のすき間 / 底面カバーの持ち上げ量（mm） |
 | `MAT` / `FINISH_RULES` / `GEL` | 質感の一覧（スズ・金・ソルダーレジスト・エポキシ・セラミックなど）/ 面の色と組立パスから質感を選ぶ規則 / ジェルの質感（濡れたクリアコート＋シーン）。<br>読み込み時に、メッシュを**面の色ごと**に分けて質感を割り当てる（`splitByFinish()`）。1つのソリッドに黒い基板・金メッキ・スズが混ざっていても、それぞれの質感になる。規則にない色は `GENERIC`、それもなければ樹脂。<br>金属・ツヤのある樹脂は `env` で映り込みの強さを個別に指定（それ以外は `scene.environmentIntensity` 0.55） |
 | `PAINT` | 脳の塗装色（溝 `fold`・地 `base`・山 `ridge`・まだらの明部 `light`） |
 | `TOUR` | しくみ7ステップ。主な項目は次の通り。<br>・`parts`（強調する部品）<br>・`labels`（引き出し線を出す部品）<br>・`path`（信号の流れの線）<br>・`explode`（分解量） |
-| `UI` / `ZH_PARTS` / `ZH_TOUR` | 日本語・繁体字中国語の文言。最初は繁中（`LANG = 'zh'`）。選んだ言語は保存しない |
+| `UI` / `ZH_PARTS` / `ZH_TOUR` / `EN_PARTS` / `EN_TOUR` | 英語・日本語・繁体字中国語の文言（日本語は PARTS / TOUR 本体、ほかは上書き）。最初は英語（`LANG = 'en'`）。選んだ言語は保存しない |
 | `glassMat` の uniforms | ガラスの見た目。<br>・`uIOR 1.5`：屈折率<br>・`uThick 28`：厚み<br>・`uBezel 18`：縁の幅<br>・`uTint 0.32`：白み<br>・`uSpec 0.55`：縁の光<br>・`uBlur 3.2`：ぼかし |
 | CSS `--accent: #0088ff` | 強調色（iOSのシステムブルー） |
 
@@ -123,7 +133,7 @@ npm run convert            # python step-mesh.py → step-colors.js → to-glb.j
    - パーツ群はカバーの上へ、脳はパーツ群の上へ抜ける。
    - 脳は本体を上下から包む形なので、動きの途中で脳の底の層が本体をすり抜けて見える（終わると重ならない）。
 2. **35〜100%**：パーツ群が細かく分かれる。
-   - 下から M5StickS3 → 内部パーツ（`layer` 順）→ シェル → 圧力センサー（ピンは +100mm まで非表示）→ アーム。
+   - 下から XIAOホルダー → 内部パーツ（`layer` 順）→ シェル → 圧力センサー（ピンは +100mm まで非表示）→ アーム。
    - 脳はパーツ群が広がる分だけ上に逃げ続ける。
 - 持ち上げ量は、部品の外形からぶつからないように自動計算。
 
@@ -180,12 +190,12 @@ WebGL2が使えない環境や、「透明度を下げる」がONの環境では
   - ダークモード対応はしない（常にライト）。
   - 観察ページでは引き出し線を出さない。しくみページで、ステップごとに必要な部品にだけ出す。
   - 自動回転は最初からON。視点は勝手に戻さない（分解量が変わったときだけ、その分だけ追従）。
-  - 分解は「脳／パーツ群／底蓋の3つ → パーツ群を細かく」の2段階。M5StickS3 と底面カバーも止まったままにしない。
+  - 分解は「脳／パーツ群／底蓋の3つ → パーツ群を細かく」の2段階。内部パーツと底面カバーも止まったままにしない。
   - 圧力センサーは分解するとシェルとアームの間に来る。センサーの「pin」は +100mm まで非表示。
   - iPadでの軽さを優先。ただし画質は落とさない。
 - **名前と色**
-  - 名称は「M5StickS3」（CAD形状はM5StickC Plusのまま）。
-  - M5本体の色は `#3F4551`。
+  - マイコンの名称は「XIAO nRF52840 Sense」（CAD形状は同じ大きさの XIAO ESP32-C3 のまま）。旧版は「M5StickS3」（CAD形状はM5StickC Plus）。
+  - LiPo は **602535**（6×25×35mm）。STEP の中の仮の板（`ボディ169`、7×38×28mm）を、603040 のモデルを縮めたものに差し替えて、その板の中心に置いている（厚み方向が x、ラベル面が外側）。603040 のラベルの文字（603040 / 600mAh）は 602535 には合わないので消して無地にした。色は STEP に1色しか入っていなかったので、`source/603040.SLDPRT` のプレビューと外観（マットアルミ・白い樹脂・黒・半透明の樹脂）に合わせて、アルミの袋・白いラベル・端のアンバーのテープに塗り分けている（make-battery.js）。
   - 脳と底面カバーは超軟質ウレタンゲル製。実物どおり、深い赤の塗装・濡れたツヤで見せる（カバーも脳と同じ色）。
 - **ホーム画面アプリでは時計などの帯を透明に**（`apple-mobile-web-app-status-bar-style: black-translucent`）。背景が画面の一番上まで続く。iOS の仕様で時計・電池などの表示は白になる。見出しやボタンは `safe-area-inset-top` で帯を避けている。iPad Air 11インチで実測（スクリーンショット3枚）：画面1180pt、時計の帯32pt。固定配置の部品は帯の下から始まるが、その範囲（と `documentElement.clientHeight`）は1116ptしかなく、帯1本分手前で終わる。ページ自体の高さ（100vh）は1148pt で、ちょうど帯の下から画面の下端まで。下端の32pt はページの外の扱いで、html の背景色で塗られる。
   - 対策：ページ全体を `body` という1つの枠にして、UI はすべてその中に配置（`position: absolute`）。ホーム画面アプリのときだけ、`fitScreen()` が枠の高さ（`--app-h`）を `100vh`（1148pt）にする。ブラウザのタブでは 100vh が Safari のツールバーの裏まで伸びることがあるので使わない。
@@ -193,8 +203,8 @@ WebGL2が使えない環境や、「透明度を下げる」がONの環境では
   - html の背景も body と同じグラデーション（`--backdrop`）にして、時計の裏まで背景が途切れずに続くようにしている。
   - 3D 描画・ガラス・引き出し線・タップ判定・しくみの構図は、枠の大きさ（`VW` / `VH`）で扱う。
 - **ページの拡大はさせない**：アクセスガイド（展示用）中にダブルタップで拡大されると戻せなくなるため。全要素に `touch-action: pan-x pan-y`（スクロールは可）、viewport に `user-scalable=no`、Safari のピンチ（`gesturestart`）を止める。3D の拡大縮小はそのまま使える。
-- **言語**：日本語 / 繁體中文（台湾）の切り替え。**最初は繁中**で開き、選んだ言語は保存しない（前の人の選択が次の人に残らないように）。
-- **5分間操作がないと最初の状態に戻る**（`backToStart()`、`IDLE_MS`）：観察・繁中・組み立て状態・外装は不透明・自動回転オン・ホームの視点・詳細パネルを閉じる。タッチ・ホイール・キー入力で計り直す。展示（アクセスガイド）用。
+- **言語**：English / 日本語 / 繁體中文（台湾）の切り替え。**最初は英語**で開き（2026-11-24〜。それまでは繁中）、選んだ言語は保存しない（前の人の選択が次の人に残らないように）。
+- **5分間操作がないと最初の状態に戻る**（`backToStart()`、`IDLE_MS`）：観察・英語・組み立て状態・外装は不透明・自動回転オン・ホームの視点・詳細パネルを閉じる。タッチ・ホイール・キー入力で計り直す。展示（アクセスガイド）用。
 - **無操作のときの分解アニメーション**（`startPulse()` / `updatePulse()`、`PULSE_MIN_MS` / `PULSE_MAX_MS`）：触られていない間、3〜4分ごと（毎回ランダム）に、1秒で最大まで分解 → 1秒そのまま → 1秒で元の分解量に戻す。観察モードのときだけ。途中で触ると止めて元に戻す。カメラは分解に合わせて今まで通り追従する。
 - 脳デバイス⇄ヘッドギアのページ間リンク（見出しの横のボタン）は削除した。
 - **UIの変遷**
@@ -203,7 +213,12 @@ WebGL2が使えない環境や、「透明度を下げる」がONの環境では
   3. ティール
   4. ドグラ・マグラ風（却下）
   5. **Apple Liquid Glass風（現在）**
-- **説明文**：スケッチ v3.9 の実際の動作に基づく。主な内容は次の通り。
+- **説明文（SIGGRAPH版）**：`source/NozuiBrain_SIGGRAPH.ino` の実際の動作に基づく。
+  - **通信**：BLE。Quest 3 には Xbox One S のゲームパッド（NozuiBrain-X1）。フェーズ（0〜8）は Quest からの振動の強さで受け取る。A＝投げ（フェーズ4）、B＝台座から外した（フェーズ3）、X＝給電が切れている、トリガー＝圧力の合計。ヘッドギアへ 0x00 停止 / 0x01 フェーズ2開始 / 0x02 サーボ値 / 0x03 今のフェーズ。
+  - **ピン**：圧力 D0–D3、DRV8833 D4（AIN1）/ D5（AIN2）、充電中 P0.17。
+  - **振動**：ヘッドギアの心拍（HEART の通知）でフェーズ3・4のときだけ。「ドッ・クン」約370ms、PWM 20kHz、モーター定格3V。
+  - **投げ**：IMU（LSM6DS3）200Hz、自由落下 0.3G 未満 → 着地の衝撃 12G 以上（または7G以上で静止）で床と判定。
+- **説明文（旧M5StickS3版）**：スケッチ v3.9 の実際の動作に基づく。主な内容は次の通り。
   - **通信**：Wi‑Fi＋OSC（受信 9000 / 送信 9002）。フェーズ0〜4。
   - **ピン**
     - ホールセンサー（KY-003）：GPIO10
@@ -220,11 +235,15 @@ WebGL2が使えない環境や、「透明度を下げる」がONの環境では
 
 ## 6. 未確認・やり残し
 
+- [ ] SIGGRAPH版：LiPo（602535）の位置・向きが実物と合っているか、`siggraph_shell (1)`（シェル後部パーツ）・`siggraph_cover`（XIAOホルダー）の呼び名が合っているか確認。
+- [ ] SIGGRAPH版の繁体字の文言を、台湾の方にチェックしてもらう。
+- [ ] SIGGRAPH版を Claude Artifact / GitHub Pages に公開し直す（展示の iPad はアプリの再起動が必要）。
+
 - [x] 圧力センサー入りのSTEPに差し替え（v16）。脳の位置補正は、CADで脳の位置が変わっていないので引き続き必要（今は `to-glb.config.json` の `shift`）。
 - [ ] **iPad Safari実機で確認**：ガラス表現、軽量化後のなめらかさ、脳の塗装の見え方。
 - [ ] 2本指で視点をずらした後、勝手に戻らないことを実機で確認。
 - [ ] 繁体字の翻訳を、台湾の方にチェックしてもらう。
-- [ ] DRV8833・モーターの電源をどこから取っているかはスケッチから分からないので、説明に書いていない。
+- [x] DRV8833・モーターの電源：SIGGRAPH版のスケッチに「VM＝電池 BAT+」とあるので、説明に書いた。
 - [ ] 画面幅900px未満では、しくみパネルが下に来るため、引き出し線のラベルと重なることがある。
 
 ---
@@ -289,3 +308,12 @@ npm run build              # dist/headgear/ にも出力
 - [x] `components_case_cover`（ケースのカバー）入りの STEP（metaq brain3）に差し替え済み（v3）。
 - [ ] 心拍センサー：スケッチは「Grove の心拍センサー（GPIO25 割り込み）」、CAD は MAX30100 モジュールの形。ページでは CAD 上の形状として注記している。
 - [ ] 「前方」（スタンド側）を顔の前としている。可動プレート・バネ・リールの役割は CAD 形状からの推定なので、説明は控えめにしている。
+
+### SIGGRAPH版（2026-11-24〜）
+- 元データ：`headgear/source/hedogggg.step`（新）＋ `headgear/source/metaq brain.step`（旧）、スケッチ `headgear/source/NozuiHeadgear_SIGGRAPH.ino`（XIAO nRF52840 Sense・BLE）。
+- 新しい STEP は **head_move から上だけが正しい**（ケース・head_move・電子部品が変わった）。それより下（MG90S ×6・スタンド・ミラーの SG90・front_attach など）は書き出しで壊れたり抜けたりしているので、旧 STEP のものを使う。`headgear/merge.js` が合成する。両方の CAD 座標は一致（フレーム部品が 0.1 mm で一致）しているので位置の補正はなし。
+- 新しい構成：XIAO nRF52840 Sense ＋ XIAO カバー、PCA9685（同じ基板）、リール＋リールカバー、耳クリップ心拍センサー用の TRRS ジャック。なくなったもの：ESP32、VL53L0X、MAX30100、spring、coil_cover。
+- サーボは8個とも旧 STEP のものを使う（新しい STEP では全部抜けていた）。ケース内の SG90 はサーボ #6（頭部衝撃、ch14、フェーズ6で 30° → 0.5秒後に 0°）。
+- ミラー：ミラー用 SG90 の腕（長い腕）の先 → ロッド（長いパーツ）→ ミラーの台（ボディ112、表面にミラー、後ろ側の蝶番が支点）の右側の出っ張り。実物はサーボ 170° でミラー約 85°（約半分）。CAD の寸法（腕の先 16.4 mm・出っ張り 36.8 mm・ロッド 88 mm）だとロッドが長すぎてこの動きにならない（計算上は最大 38° ほど）ので、ページでは台をサーボの半分の角度で回し、ロッドは腕の先と出っ張りを結ぶように長さ方向に伸び縮みさせて描いている（MIRROR_LINK / buildMirrorLink()）。merge.js はロッドと台をサーボの組立に移すだけ（mirror_rod / mirror_plate）。
+- しくみ7ステップ：全体／通信（BLE）／圧力（0x02 → MG90S、0〜60°）／心拍（D0 → 脳デバイス）／衝撃（フェーズ6）／ミラー（フェーズ6）／椅子（UART）。
+- 変換：`npm run headgear:convert`（旧 STEP → raw-old.json、新 STEP → raw.json、merge.js、to-glb.js）。

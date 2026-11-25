@@ -1,4 +1,6 @@
 {
-  "_shift": "CAD placement error in 'brain device2.step': the gel brain + its base cover sit off the device. Moving them by 'by' (mm) puts the device into the brain's inner cavity (voxel fit: device-in-gel 16% -> 0.6% of surface points, max ~2 mm). Remove once fixed in CAD.",
-  "shift": { "parts": ["brain", "brain_cover"], "by": [0, -9.5, -18.5] }
+  "_shift": "CAD placement error in 'brain device2.step': the gel brain + its base cover sit off the device. Moving them by 'by' (mm) puts the device into the brain's inner cavity (voxel fit: device-in-gel 16% -> 0.6% of surface points, max ~2 mm). The SIGGRAPH STEP has no gel; add-gel.js brings it in from source/gel.json, and the device keeps the old CAD coordinates, so the same shift applies.",
+  "shift": { "parts": ["brain", "brain_cover"], "by": [0, -9.5, -18.5] },
+  "_recolor": "The SIGGRAPH STEP comes without colours: keep the printed shell and arms the dark grey they had before. (The DRV8833 board brings its own face colours.)",
+  "recolor": { "siggraph_shell": "3f3f3f", "siggraph_shell (1)": "3f3f3f", "siggraph_arm1": "3f3f3f", "siggraph_arm2": "3f3f3f" }
 }

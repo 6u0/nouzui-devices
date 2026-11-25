@@ -249,9 +249,9 @@ body.touring .tools, body.touring .sheet { display: none; }
 <div class="loading" id="loading" data-i18n="loading">LOADING MODEL…</div>
 
 <header class="titleblock">
-  <div class="eyebrow-row"><span class="eyebrow">Brain Device · Rev 2</span></div>
+  <div class="eyebrow-row"><span class="eyebrow">Brain Device · SIGGRAPH</span></div>
   <h1 data-i18n="title">脳デバイスの中身</h1>
-  <span class="dims">96.1 × 127.4 × 82.5 mm · 142 solids</span>
+  <span class="dims">96.1 × 127.4 × 82.5 mm · 86 solids</span>
 </header>
 
 <nav class="modes glass" data-i18n-aria="modes" aria-label="表示モード">
@@ -259,9 +259,10 @@ body.touring .tools, body.touring .sheet { display: none; }
   <button id="mode-tour" aria-pressed="false" data-i18n="tour">しくみ</button>
 </nav>
 
-<nav class="modes langs glass" aria-label="言語 / 語言">
+<nav class="modes langs glass" aria-label="Language / 言語 / 語言">
+  <button id="lang-en" aria-pressed="true" lang="en">English</button>
   <button id="lang-ja" aria-pressed="false" lang="ja">日本語</button>
-  <button id="lang-zh" aria-pressed="true" lang="zh-Hant">繁中</button>
+  <button id="lang-zh" aria-pressed="false" lang="zh-Hant">繁中</button>
 </nav>
 
 <div class="rail glass lit">
@@ -310,8 +311,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ---------- Part catalogue ----------
 // sel: matched against each mesh's CAD assembly path (extras.path from to-glb.js, e.g.
-// "M5StickC Plus/M5StickC v14/pinsocket_8 v2"). A mesh goes to the first part whose sel matches,
-// with m5 tried last so the screws and socket inside the M5 assembly land in their own parts.
+// "Seeed Studio XIAO-ESP32-C3/Shield"; the CAD uses the ESP32-C3 shape, the device has a XIAO
+// nRF52840 Sense of the same size). A mesh goes to the first part whose sel matches.
 // Meshes no part claims are listed in the console after loading.
 // finish: surface override ('gel' or material params); paint: paintGel() mode for the gel bodies
 // anchor: 'one' puts the leader dot on one source mesh (the right-most) instead of the part's centre
@@ -322,41 +323,31 @@ const PARTS = [
     desc: 'デバイス全体をすっぽり包む、脳の形をした外装。超軟質ウレタンゲル製で、指で押すとやわらかく沈みます。中の機械部品は、このジェルの内側に収まっています。', spec: [['材質', '超軟質ウレタンゲル'], ['外形', '約 96 × 127 × 83 mm']] },
   { id: 'braincover', ref: 'G2', name: '底面ジェルカバー', en: 'brain_cover', sel: /^brain_cover$/, finish: 'gel', paint: 'flat', stack: 'cover', ghost: true,
     desc: '脳型外装の底のくぼみにはまる楕円形のフタ。脳型外装と同じ超軟質ウレタンゲル製で、デバイス本体はこの上のジェルの層をはさんだ空洞に収まっています。', spec: [['材質', '超軟質ウレタンゲル'], ['外形', '約 49 × 81 × 10 mm']] },
-  { id: 'shell', ref: 'H1', name: 'シェル（本体外装）', en: 'shell', sel: /^shell$/, stack: 'shell', ghost: true,
-    desc: '全体を受け止める土台の外装。内部の部品はすべてこの上に積み重なっています。', spec: [['材質', '3Dプリント樹脂（CAD上の外観設定）']] },
-  { id: 'm5', ref: 'U1', name: 'M5StickS3', en: 'M5StickS3', sub: '制御・頭脳（ESP32-S3）', sel: /^M5StickC Plus\//, layer: 0, callout: true,
-    desc: 'デバイスの頭脳。Wi‑Fiで外部のPCとつながり、OSCメッセージでやりとりします。PCから指示されるフェーズ（0〜4）によって、センサーを読むか・振動させるかが切り替わります。',
-    spec: [['通信', 'Wi‑Fi + OSC（UDP 受信 9000 / 送信 9002）'], ['入力', 'ホール GPIO10 / 圧力 GPIO1–4 / ボタン GPIO11'], ['出力', '振動PWM GPIO8・GPIO7 / LED 赤 GPIO0・緑 GPIO43'], ['監視', 'LiPo電圧 GPIO5 / 充電中 GPIO6'], ['内蔵IMU', '衝撃検知（フェーズ4）'], ['ボタン', '1回: 画面切替 / 2回: 充電専用モード / 10秒長押し: 電源OFF']] },
-  { id: 'screws', ref: 'S1', name: 'M2キャップスクリュー ×2', en: 'M2 cap screw 8mm', sel: /M2 cap screw/, layer: 0.4,
-    desc: '内部部品を固定するM2のネジ（長さ8mm）。', spec: [['規格', 'M2 × 8mm']] },
-  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'lipo battery', sel: /lipo battery$/, finish: { metalness: 0.55, roughness: 0.32, env: 1 }, layer: 1, sub: '電源（GPIO5で電圧監視）',
-    desc: 'M5StickS3本体とは別の充電式リチウムポリマー電池。電圧はM5StickS3が常に監視していて、1秒ごとにPCへ送られます。', spec: [['電圧監視', 'GPIO5（1/2に分圧して読み、×2で復元・10回平均）'], ['低残量', '3.55 V 未満で赤LED点滅'], ['PCへ送信', '/battery/lipo（1秒ごと）'], ['外形', '約 8 × 34 × 20 mm']] },
-  { id: 'hallcase', ref: 'H2', name: 'ホールセンサーケース', en: 'hall_sensor_case', sel: /^hall_sensor_case$/, layer: 1.3, ghost: false,
-    desc: 'ホールセンサーまわりを保持する縦向きの樹脂パーツ。', spec: [['材質', '3Dプリント樹脂']] },
-  { id: 'socket', ref: 'J1', name: '8ピンソケット', en: 'pinsocket_8', sub: 'M5StickS3との接続', sel: /pinsocket_8/, layer: 1.6,
-    desc: 'M5StickS3のピンヘッダを受けるソケット。ここから内部の基板やセンサーへ信号がつながります。', spec: [['ピン数', '8']] },
-  { id: 'vibrator', ref: 'M1', name: '振動モーター', en: 'vibrator', sel: /(^|\/)vibrator$/, finish: { metalness: 0.9, roughness: 0.25, env: 1 }, layer: 2, sub: '出力（心拍パターン）',
-    desc: 'DRV8833から電流を受けて回る振動モーター。PCから /heartrate を受け取るたびに、心拍のような約0.33秒の振動を1回出します。', spec: [['波形', '0→220→220→130→40→80→0（PWM値 / 255）'], ['長さ', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
-  { id: 'chargerbase', ref: 'H3', name: '充電モジュール台座', en: 'charger_substrare', sel: /charger_substrare$/, layer: 2,
-    desc: '充電モジュールを載せるための台座パーツ。', spec: [['材質', '3Dプリント樹脂']] },
-  { id: 'drvcase', ref: 'H4', name: 'ドライバーケース', en: 'diver_case', sel: /^diver_case$/, layer: 2.7,
-    desc: 'モータードライバー基板とホールセンサーを載せるケース。', spec: [['材質', '3Dプリント樹脂']] },
-  { id: 'drv', ref: 'U2', name: 'DRV8833', en: 'DRV8833', sub: 'モータードライバー', sel: /^DRV8833/, layer: 3.4, callout: true,
-    desc: 'マイコンの弱い信号を、モーターを回せる大きな電流に変える「増幅役」。M5StickS3のピンから直接モーターを回すことはできないため、この基板を間に挟みます。',
-    spec: [['IC', 'TI DRV8833（デュアルHブリッジ）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← LOW固定（回転は一方向）'], ['出力', '振動モーターへ']] },
-  { id: 'tp', ref: 'U3', name: 'TP4057', en: 'TP4057 Mini', sub: '充電モジュール（USB-C）', sel: /^Charging Module TP4057/, layer: 3.4, callout: true,
-    desc: 'USB-Cから給電してLiPoバッテリーを充電する小型モジュール。充電中を示すCHRG信号をM5StickS3が読み取り、LiPoが「充電中」か「満充電」かを判定します。',
-    spec: [['IC', 'TP4057 リニア充電IC'], ['入力', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中、10サンプルでノイズ除去）'], ['判定', 'M5に給電中（VBUS ≥ 4.0 V）のときだけ']] },
-  { id: 'hall', ref: 'U4', name: 'ホールセンサー', en: 'KY-003 Hall Sensor', sel: /^KY-003 Hall Sensor/, layer: 4, sub: '入力（GPIO10）',
-    desc: '磁石を検出するセンサー。フェーズ3のとき、出力がLOWからHIGHに切り替わった瞬間にM5StickS3がPCへ /magnet を送ります。', spec: [['モジュール', 'KY-003'], ['接続', 'GPIO10（デジタル入力・プルアップ）'], ['電源', 'M5StickS3 の EXT 5V 出力'], ['PCへ送信', '/magnet 1（フェーズ3）']] },
-  { id: 'pressure', ref: 'U5', name: '圧力センサー ×4', en: 'RP-C10-ST', sub: '入力（GPIO1–4）', sel: /^RP-C10-ST[^/]*\/(?!pin_)/, stack: 'sensors', anchor: 'one', callout: true,
-    desc: 'シェルの左右の内側に2枚ずつ貼られた、薄いフィルム型の圧力センサー。押されると抵抗が下がり、その変化をM5StickS3がGPIO1–4のアナログ入力で読み取ります。フェーズ3と4のあいだ20msごとに読み、0〜100の値として /power でPCへ送ります。',
-    spec: [['型番', 'RP-C10-ST（薄膜圧力センサー）'], ['数', '4枚（左右に2枚ずつ）'], ['接続', 'GPIO1 / 2 / 3 / 4（アナログ入力）'], ['構造', 'PETフィルム＋カーボン層＋銀電極、圧着端子'], ['PCへ送信', '/power（6chに補間、20msごと）']] },
+  { id: 'shell', ref: 'H1', name: 'シェル（本体外装）', en: 'siggraph_shell', sel: /^siggraph_shell$/, stack: 'shell', ghost: true,
+    desc: '全体を受け止める土台の外装。内部の部品はすべてこの中に収まり、左右の内側には圧力センサーが2枚ずつ貼られています。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'shellback', ref: 'H2', name: 'シェル後部パーツ', en: 'siggraph_shell (1)', sel: /^siggraph_shell \(1\)$/, stack: 'shell', ghost: true,
+    desc: 'シェルの後ろ側の下部をふさぐ、曲面の樹脂パーツ。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'holder', ref: 'H3', name: 'XIAOホルダー', en: 'siggraph_cover', sel: /^siggraph_cover$/, layer: 0,
+    desc: 'XIAOを縦に立てて支える樹脂の台。上面の溝には振動モーターが収まり、底のネジ穴付きのフランジでシェルに固定します。', spec: [['材質', '3Dプリント樹脂']] },
+  { id: 'xiao', ref: 'U1', name: 'XIAO nRF52840 Sense', en: 'Seeed Studio XIAO nRF52840 Sense', sub: '制御・頭脳（Bluetooth LE）', sel: /^Seeed Studio XIAO/, layer: 2, callout: true,
+    desc: 'デバイスの頭脳となる親指大のマイコン基板。Bluetooth LEで2台と同時につながります。Meta Quest 3 には「Xboxのゲームパッド」として、ヘッドギアには指示を送る側としてつながり、Questから知らされるフェーズ（0〜8）に合わせて、センサーを読んだり心拍で振動したりします。',
+    spec: [['無線', 'Bluetooth LE（Quest 3 へ HID ゲームパッド / ヘッドギアへ GATT）'], ['名前', 'NozuiBrain-X1（Xbox One S として名乗る）'], ['入力', '圧力 D0–D3（アナログ）/ 内蔵IMU LSM6DS3（投げ検出）'], ['出力', 'DRV8833 D4・D5（PWM 20 kHz）'], ['電源', 'USB給電の検出（台座）/ 充電中 P0.17 / 電池電圧'], ['LED', '赤点滅：未接続 / 緑：Questのみ / 青点滅：頭のみ / 水色：両方']] },
+  { id: 'battery', ref: 'BT1', name: 'LiPoバッテリー', en: 'LiPo 602535', sel: /^lipo battery$/, layer: 1, sub: '電源',
+    desc: '充電式のリチウムポリマー電池。XIAOに内蔵された充電回路が、台座のUSB給電から充電します。電圧は2秒ごとに測られ、残量(%)としてQuestに知らされます。振動モーターの電源（DRV8833のVM）もここから取っています。', spec: [['充電', 'XIAO内蔵の充電回路（100 mA）'], ['型番', '602535（3.7 V）'], ['電圧の測定', '2秒ごと（モーターが止まって0.2秒たってから）'], ['Questへ', '電池残量 %（Battery Service と HID の2通り）'], ['外形', '6 × 25 × 35 mm']] },
+  { id: 'drv', ref: 'U2', name: 'DRV8833', en: 'DRV8833', sub: 'モータードライバー', sel: /^DRV8833/, layer: 0.6, callout: true,
+    desc: 'マイコンの弱い信号を、モーターを回せる大きな電流に変える「増幅役」。XIAOのピンから直接モーターを回すことはできないため、この基板を間に挟みます。電池から取った電源で、振動モーターを正転・ブレーキ（逆転）させます。',
+    spec: [['IC', 'TI DRV8833（デュアルHブリッジ）'], ['AIN1 / AIN2', 'D4 / D5 ← PWM 20 kHz（耳に聞こえない）'], ['電源 VM', '電池（BAT+、3.0〜4.2 V）'], ['強さの上限', 'モーターに3 Vを超えてかからないよう、電池電圧に合わせて幅を抑える']] },
+  { id: 'vibrator', ref: 'M1', name: '振動モーター ×2', en: 'vibrator', sel: /(^|\/)vibrator$/, finish: { metalness: 0.9, roughness: 0.25, env: 1 }, layer: 1.4, sub: '出力（心拍の振動）',
+    desc: 'DRV8833から電流を受けて回る、偏心おもり式の振動モーター（ERM）。左右に1個ずつ入っています。ヘッドギアから心拍が届くと、フェーズ3・4のときだけ「ドッ・クン」という約0.37秒の振動を出します。',
+    spec: [['種類', 'ERM（DC 3 V）'], ['数', '2個（左右）'], ['波形', 'ドッ（強さ255）→ 間 0.11秒 → クン（強さ180）'], ['長さ', '約 370 ms（拍の終わりに逆向きの短いブレーキ）'], ['外形', '約 φ7 × 25 mm']] },
+  { id: 'pressure', ref: 'U5', name: '圧力センサー ×4', en: 'RP-C10-ST', sub: '入力（D0–D3）', sel: /^RP-C10-ST[^/]*\/(?!pin_)/, stack: 'sensors', anchor: 'one', callout: true,
+    desc: 'シェルの左右の内側に2枚ずつ貼られた、薄いフィルム型の圧力センサー。押されると抵抗が変わり、その変化をXIAOがD0〜D3のアナログ入力で読み取ります。50msごとに読み、押されていないときを0、強く押したときを100とする値に直して、ヘッドギアとQuestへ送ります。',
+    spec: [['型番', 'RP-C10-ST（薄膜圧力センサー）'], ['数', '4枚（左右に2枚ずつ）'], ['接続', 'D0 / D1 / D2 / D3（12bit アナログ入力）'], ['構造', 'PETフィルム＋カーボン層＋銀電極、圧着端子'], ['送り先', 'ヘッドギア（6chに補間）/ Quest（合計をトリガー値に）']] },
   { id: 'pressurepins', ref: 'U5', name: '圧力センサーの端子ピン', en: 'RP-C10-ST pin', sel: /^RP-C10-ST[^/]*\/pin_/, stack: 'sensors', showFrom: 100,
     desc: '圧力センサーの端子から出ている2本のピン。組み立てた状態では見えないため、分解量が +100 mm を超えてから表示します。', spec: [['本数', '2本 × 4枚']] },
-  { id: 'arm2', ref: 'H5', name: 'アーム2（上部カバー前）', en: 'arm2', sel: /^arm2$/, stack: 'arms', ghost: true,
+  { id: 'arm2', ref: 'H5', name: 'アーム2（上部カバー前）', en: 'siggraph_arm2', sel: /^siggraph_arm2$/, stack: 'arms', ghost: true,
     desc: '頭頂部を覆うカーブしたカバーの前側。', spec: [['材質', '3Dプリント樹脂']] },
-  { id: 'arm1', ref: 'H6', name: 'アーム1（上部カバー後）', en: 'arm1', sel: /^arm1$/, stack: 'arms', ghost: true,
+  { id: 'arm1', ref: 'H6', name: 'アーム1（上部カバー後）', en: 'siggraph_arm1', sel: /^siggraph_arm1$/, stack: 'arms', ghost: true,
     desc: '頭頂部を覆うカーブしたカバーの後ろ側。', spec: [['材質', '3Dプリント樹脂']] },
 ];
 const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
@@ -364,7 +355,7 @@ const byId = Object.fromEntries(PARTS.map((p) => [p.id, p]));
 //  1) 0 → GROUP_SPLIT: three blocks come apart — gel base cover (lifts a little), the device group
 //     (clears the cover) and the gel brain (clears the device).
 //  2) GROUP_SPLIT → 1: the device group comes apart: internal parts rise LAYER_GAP mm per layer above
-//     the M5, 'shell' lifts clear of the internals, the pressure 'sensors' clear of the shell and
+//     the XIAO holder, 'shell' lifts clear of the internals, the pressure 'sensors' clear of the shell and
 //     'arms' clear of the sensors; the brain keeps
 //     rising so it stays clear of the growing stack. (Rises come from the bounding boxes once loaded.)
 const GROUP_SPLIT = 0.35;  // share of the slider used by stage 1
@@ -393,13 +384,13 @@ const MAT = {
   label:   { metalness: 0, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.02, env: 1.2 },   // laminated stickers: mirror gloss
   pvc:     { metalness: 0, roughness: 0.36, clearcoat: 0.5, clearcoatRoughness: 0.2, env: 0.8 }, // wire jackets
   lens:    { metalness: 0, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, env: 1 },  // LEDs, sensor windows
-  m5:      { metalness: 0, roughness: 0.38, clearcoat: 0.7, clearcoatRoughness: 0.2, env: 0.85 },  // M5StickS3 body
   printed: { metalness: 0, roughness: 0.72 },               // printed inner cases
   carbon:  { metalness: 0, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.5 },  // printed carbon shell / arms
   film:    { metalness: 0, roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15, env: 0.85 },  // PET film
   ink:     { metalness: 0, roughness: 0.75 },               // carbon ink
   silver:  { metalness: 1, roughness: 0.38, env: 1 },       // printed silver electrode
-  matte:   { metalness: 0, roughness: 0.6 },                // white stiffener
+  matte:   { metalness: 0, roughness: 0.6 },                // white stiffener, battery label
+  pouch:   { metalness: 0.55, roughness: 0.32, env: 1 },    // LiPo aluminium pouch
 };
 // No CAD outlines on these: the label lettering and the hundreds of tiny pins / pads / leads made
 // over half of all outline segments, drawn as dark fuzz; metal already reads by its reflections.
@@ -407,25 +398,19 @@ const NO_EDGES = new Set(['label', 'tin', 'gold']);
 // [path test, { face colour: finish }]: the first rule whose path matches and that names the colour
 // wins (colours match within a few steps, the bake rounds them). Unlisted colours fall to GENERIC.
 const FINISH_RULES = [
-  [/^M5StickC[^/]*\/M5StickC v14\/COMPOUND$/, { '3d4350': 'm5', '121212': 'case', f3cc7d: 'gold' }],
-  [/Grove socket/, { ccccae: 'nylon', d2cdc1: 'tin' }],
-  [/M2 cap screw/, { cccccc: 'steel' }],
-  [/pinsocket|USB C|\/Mold$/, { '121212': 'nylon', '414141': 'nylon', f3cc7d: 'gold', ffffff: 'tin' }],
-  [/HRO_TYPE-C/, { f4e6a8: 'gold', d2cdc1: 'tin' }],
-  [/^Charging[^/]*\/COMPOUND$/, { f7ead2: 'mask', '121212': 'epoxy' }],
-  [/LED 0603/, { '00ff00': 'lens', ff0000: 'lens', ffffff: 'epoxy', c5c5c5: 'tin', f3cc7d: 'gold' }],
-  [/\/R0[46]0[23] v/, { '4b4b4b': 'epoxy', a59e9a: 'ceramic' }],
-  [/CeramicBody/, { b49756: 'ceramic' }],
-  [/^DRV8833/, { '060606': 'mask', '919191': 'fr4', ffffff: 'tin', cbd2ef: 'tin', f0f0f0: 'tin', '7b7b7b': 'epoxy', '2a2a2a': 'epoxy', '0d0d0d': 'epoxy',
-    a28b0b: 'ceramic', '846e06': 'ceramic', '907a06': 'ceramic', '2e2501': 'ceramic', ff4e0d: 'lens' }],
-  [/^KY-003/, { '3e3e3e': 'mask', '222222': 'nylon', f5f5f6: 'tin', c5c6c5: 'tin', a1a1a1: 'epoxy', f0e502: 'ceramic' }],
+  [/^Seeed Studio XIAO[^/]*\/(Shield|USB TYPE C|U\.FL)/, { a0a0a0: 'tin', bfbfbf: 'tin', bebcba: 'gold', '4c4c4c': 'nylon' }],
+  [/^Seeed Studio XIAO[^/]*\/SOLID$/, { '82745f': 'mask' }],
+  [/^Seeed Studio XIAO[^/]*\/Button/, { a0a0a0: 'epoxy' }],
+  [/^DRV8833/, { '151515': 'mask', '909090': 'fr4', ffffff: 'tin', cad1ee: 'tin', f0f0f0: 'tin', '7a7a7a': 'epoxy', '2e2e2e': 'epoxy', '0e0e0e': 'epoxy',
+    a18a13: 'ceramic', '836e0f': 'ceramic', '8f790e': 'ceramic', '322a06': 'ceramic', ff4f15: 'lens' }],
+  [/^lipo battery$/, { bfbfc2: 'pouch', ededeb: 'matte', c78c1f: 'film' }],
   [/carbon_ink/, { '1b1b1f': 'ink' }],
   [/pet_film/, { e6e9e6: 'film' }],
   [/silver_electrode/, { d2d2cd: 'silver' }],
   [/crimp_|\/pin_/, { c0c3c8: 'steel', b9bbc3: 'steel' }],
   [/stiffener_white/, { f7f7f5: 'matte' }],
-  [/^(shell|arm1|arm2)$/, { '3d3d3d': 'carbon' }],
-  [/^(diver_case|hall_sensor_case)$|charger_substrare$/, { a1a1a1: 'printed' }],
+  [/^siggraph_(shell|shell \(1\)|arm1|arm2)$/, { '3d3d3d': 'carbon' }],
+  [/^siggraph_cover$/, { a0a0a0: 'printed' }],
 ];
 const GENERIC = { f6f6f3: 'tin', ffffff: 'tin', c5c5c5: 'tin', f3cc7d: 'gold', f4e6a8: 'gold', '121212': 'epoxy' };
 const near = (map, rgb) => {
@@ -557,23 +542,23 @@ function paintGel(g, mode) {
 
 // ---------- How-it-works tour ----------
 const TOUR = [
-  { tab: '全体', labels: ['m5', 'hall', 'vibrator', 'battery'], title: '全体の構成', flow: 'PC ⇄ Wi‑Fi / OSC ⇄ M5StickS3', parts: [], explode: 0.55, ghost: true,
-    text: 'M5StickS3がWi‑Fi経由でPCとOSCメッセージをやりとりします。PCが /phase でフェーズ（0〜4）を指示し、デバイスはフェーズに応じてセンサーの値を送ったり、振動したりします。' },
-  { tab: '通信', labels: ['m5'], title: 'PCとのやりとり（OSC）', flow: 'PC → /phase /heartrate /battery /init /reboot', path: [], parts: ['m5'], explode: 0.5,
-    text: '起動するとWi‑Fiにつながり、PCへ /ask を送ります。以降は1秒ごとに電池の状態（/battery/m5、/battery/lipo）を送信します。フェーズ3では圧力とホールセンサー、フェーズ4では圧力と衝撃をPCへ送ります。' },
-  { tab: '磁石', labels: ['hall', 'socket', 'm5'], title: '入力：ホールセンサー', flow: 'ホールセンサー → GPIO10 → M5StickS3 → /magnet', path: ['hall', 'socket', 'm5'], parts: ['hall', 'socket', 'm5'], explode: 0.65,
-    text: 'フェーズ3のとき、ホールセンサーの出力がLOWからHIGHに切り替わった瞬間に、M5StickS3がPCへ /magnet を送ります。' },
-  { tab: '圧力', labels: ['pressure', 'm5'], title: '入力：圧力センサー（4ch）', flow: '圧力センサー ×4 → GPIO1–4 → 6chに補間 → /power（20msごと）', path: ['pressure', 'socket', 'm5'], parts: ['pressure', 'pressurepins', 'socket', 'm5'], explode: 0.55,
-    text: 'シェルの左右の内側に、フィルム型の圧力センサーが2枚ずつ貼られています。フェーズ3と4のあいだ、4つのセンサーを20msごとに読み取ります。隣どうしを少し混ぜ合わせて6chに広げ、0〜100の値として /power で送ります。' },
-  { tab: '衝撃', labels: ['m5'], title: '入力：衝撃（内蔵IMU）', flow: 'IMU → 加速度の変化 > 5G → /gravity', path: [], parts: ['m5'], explode: 0.5,
-    text: 'フェーズ4では、M5StickS3内蔵のIMUで加速度の大きさを見ています。前回の値から5G以上変化すると、PCへ /gravity を1回だけ送ります（フェーズ開始から0.5秒間は無視）。' },
-  { tab: '振動', labels: ['m5', 'drv', 'vibrator'], title: '出力：心拍の振動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 振動モーター', path: ['m5', 'drv', 'vibrator'], parts: ['m5', 'drv', 'vibrator', 'socket'], explode: 0.65,
-    text: 'フェーズ2以上でPCから /heartrate 1 を受け取ると、約0.33秒の振動を1回出します。強さ（PWM値）は 0→220→220→130→40→80→0 と変化します。PWMはGPIO8から1kHzで出力され、DRV8833で増幅されて振動モーターを回します。' },
-  { tab: '電源', labels: ['tp', 'battery', 'm5'], title: '電源：充電と電池の監視', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電圧 → GPIO5', path: ['tp', 'battery', 'm5'], parts: ['tp', 'battery', 'chargerbase', 'm5'], explode: 0.65,
-    text: 'TP4057がUSB-CからLiPoを充電します。M5StickS3はLiPoの電圧（GPIO5）と充電中かどうか（GPIO6）を常に監視しています。LiPoが3.55V未満か、本体の残量が20%未満になると、赤LEDが点滅します。ボタンを2回押すと、Wi‑Fiや振動を止めた充電専用モードになります。' },
+  { tab: '全体', labels: ['xiao', 'pressure', 'vibrator', 'battery'], title: '全体の構成', flow: 'Quest 3 ⇄ BLE ⇄ XIAO ⇄ BLE ⇄ ヘッドギア', parts: [], explode: 0.55, ghost: true,
+    text: 'XIAO nRF52840 SenseがBluetooth LEで2台と同時につながります。Meta Quest 3 からは体験の進み具合（フェーズ0〜8）を受け取り、ヘッドギアへはフェーズと圧力の値を送ります。フェーズに合わせて、押された・投げられた・台座から外されたことを知らせたり、心拍で振動したりします。' },
+  { tab: '通信', labels: ['xiao'], title: 'Quest・ヘッドギアとのやりとり（BLE）', flow: 'Quest →（振動の強さ）→ フェーズ ／ XIAO → ヘッドギア 0x00〜0x03', path: [], parts: ['xiao'], explode: 0.5,
+    text: 'Quest 3 からは、このデバイスがXbox One Sのゲームパッドに見えています。Questは「振動の強さ」(フェーズ+1)/10 でフェーズを知らせ、デバイスはボタン（A：投げた／B：台座から外した／X：給電が切れている）とトリガー（圧力の合計）で答えます。ヘッドギアへは、フェーズが変わったときと1秒ごとに今のフェーズ（0x03）を送り、フェーズ2の開始（0x01）や停止（0x00）も指示します。' },
+  { tab: '圧力', labels: ['pressure', 'xiao'], title: '入力：圧力センサー（4ch）', flow: '圧力センサー ×4 → D0–D3 → 0〜100 → ヘッドギア（6ch）・Quest（トリガー）', path: ['pressure', 'xiao'], parts: ['pressure', 'pressurepins', 'xiao'], explode: 0.55,
+    text: 'シェルの左右の内側に、フィルム型の圧力センサーが2枚ずつ貼られています。XIAOは4つのセンサーを50msごとに読み、押していないときを0、強く押したときを100とする値に直します。フェーズ3と4のあいだ、隣どうしを混ぜて6chに広げた値をヘッドギアのサーボへ、4つの合計をQuestのトリガー値として送ります。押すと値が増えるか減るかの向きは、最初の数回の押し込みで自動で決めて保存します。' },
+  { tab: '投げ', labels: ['xiao'], title: '入力：投げ（内蔵IMU）', flow: 'IMU（200 Hz）→ 自由落下 → 着地の衝撃 → Aボタン', path: [], parts: ['xiao'], explode: 0.5,
+    text: 'フェーズ4では、XIAOに内蔵されたIMU（LSM6DS3）で、1秒に200回、加速度と回転を見ています。ほぼ無重力（0.3G未満）の状態がしばらく続くと「投げた／落とした」と判断し、その後の衝撃が大きい（12G以上、または7G以上でそのまま止まった）と「床に落ちた」としてQuestへAボタンを送ります。手でキャッチしたときは何も送りません。' },
+  { tab: '台座', labels: ['xiao', 'battery'], title: '入力：台座から外す', flow: '台座のUSB給電 → XIAO → Bボタン ／ Xボタン', path: [], parts: ['xiao'], explode: 0.5,
+    text: 'デバイスは台座に載せている間、USBで給電されています。XIAOは給電の有無を見ていて、フェーズ3で台座から持ち上げられた瞬間にQuestへBボタンを送ります。給電が切れている間はXボタンを押したままにして、Questに知らせます。台座に戻して給電が来ると、合図に1回だけ心拍の振動を鳴らします。' },
+  { tab: '振動', labels: ['xiao', 'drv', 'vibrator'], title: '出力：心拍の振動', flow: 'ヘッドギアの心拍 → XIAO D4・D5 PWM → DRV8833 → 振動モーター ×2', path: ['xiao', 'drv', 'vibrator'], parts: ['xiao', 'drv', 'vibrator'], explode: 0.65,
+    text: 'ヘッドギアから心拍の合図が届くたびに、フェーズ3・4のときだけ、XIAOがD4・D5から20kHzのPWMを出し、DRV8833で増幅して振動モーターを回します。強い「ドッ」、0.11秒の間、少し弱い「クン」の約0.37秒で、拍の終わりには逆向きに短く回してキレを出します。' },
+  { tab: '電源', labels: ['battery', 'xiao'], title: '電源：充電と電池残量', flow: '台座のUSB → XIAOの充電回路 → LiPo ／ 電圧 → 残量% → Quest', path: ['battery', 'xiao'], parts: ['battery', 'xiao'], explode: 0.6,
+    text: '台座のUSB給電で、XIAOに内蔵された充電回路がLiPoを充電します（100mA）。XIAOは電池の電圧を2秒ごとに測り、残量（%）に直してQuestへ知らせます。振動モーターの電源も電池から取っていて、モーターに3Vを超える電圧がかからないよう、電池の電圧に合わせてPWMの幅を抑えています。' },
 ];
 
-// ---------- Language: 日本語 (default, in PARTS/TOUR above) / 繁體中文（台灣） ----------
+// ---------- Language: English (default, EN_*) / 日本語 (base text, in PARTS/TOUR above) / 繁體中文（台灣） ----------
 const UI = {
   ja: {
     title: '脳デバイスの中身', loading: 'LOADING MODEL…', loadFail: 'モデルを読み込めませんでした。ページを再読み込みしてください。',
@@ -587,63 +572,102 @@ const UI = {
     prev: '← 上一步', next: '下一步 →',
     stage: '腦裝置的 3D 模型。拖曳可旋轉，雙指可縮放', modes: '顯示模式', track: '高度方向的分解量', close: '關閉',
   },
+  en: {
+    title: 'Inside the Brain Device', loading: 'LOADING MODEL…', loadFail: 'Could not load the model. Please reload the page.',
+    explore: 'Explore', tour: 'How it works', explode: 'Explode', ghost: 'See-through shell', spin: 'Auto-rotate', reset: 'Reset view',
+    prev: '← Back', next: 'Next →',
+    stage: '3D model of the brain device. Drag to rotate, pinch to zoom', modes: 'View mode', track: 'Vertical explode amount', close: 'Close',
+  },
 };
 const ZH_PARTS = {
   brain: { name: '腦形凝膠外殼', desc: '把整個裝置完整包覆、做成大腦形狀的外殼。以超軟質胺甲酸乙酯凝膠製成，用手指按壓會柔軟地陷下去。內部的機構零件都收在這層凝膠裡面。', spec: [['材質', '超軟質胺甲酸乙酯凝膠'], ['外形', '約 96 × 127 × 83 mm']] },
   braincover: { name: '底面凝膠蓋', desc: '嵌入腦形外殼底部凹槽的橢圓形蓋子。與腦形外殼同樣以超軟質胺甲酸乙酯凝膠製成，裝置本體則收在它上方、隔著一層凝膠的空腔裡。', spec: [['材質', '超軟質胺甲酸乙酯凝膠'], ['外形', '約 49 × 81 × 10 mm']] },
-  shell: { name: '外殼（本體）', desc: '承載整體的底座外殼。內部零件全部疊放在它上面。', spec: [['材質', '3D 列印樹脂（CAD 外觀設定）']] },
-  m5: { sub: '控制・大腦（ESP32-S3）',
-    desc: '裝置的大腦。透過 Wi‑Fi 連線到外部電腦，以 OSC 訊息互相溝通。依照電腦指定的階段（0〜4），切換要讀取感測器還是產生震動。',
-    spec: [['通訊', 'Wi‑Fi + OSC（UDP 接收 9000／傳送 9002）'], ['輸入', '霍爾 GPIO10／壓力 GPIO1–4／按鈕 GPIO11'], ['輸出', '震動 PWM GPIO8・GPIO7／LED 紅 GPIO0・綠 GPIO43'], ['監測', 'LiPo 電壓 GPIO5／充電中 GPIO6'], ['內建 IMU', '撞擊偵測（階段 4）'], ['按鈕', '按 1 次：切換畫面／按 2 次：僅充電模式／長按 10 秒：關機']] },
-  screws: { name: 'M2 內六角螺絲 ×2', desc: '固定內部零件的 M2 螺絲（長 8mm）。', spec: [['規格', 'M2 × 8mm']] },
-  battery: { name: 'LiPo 電池', sub: '電源（以 GPIO5 監測電壓）',
-    desc: '與 M5StickS3 本體分開的鋰聚合物充電電池。M5StickS3 會持續監測它的電壓，並每秒傳送給電腦。',
-    spec: [['電壓監測', 'GPIO5（分壓成 1/2 讀取，×2 還原，取 10 次平均）'], ['低電量', '低於 3.55 V 時紅色 LED 閃爍'], ['傳送給電腦', '/battery/lipo（每秒）'], ['外形', '約 8 × 34 × 20 mm']] },
-  hallcase: { name: '霍爾感測器外殼', desc: '固定霍爾感測器周邊的直立樹脂零件。', spec: [['材質', '3D 列印樹脂']] },
-  socket: { name: '8 針插座', sub: '與 M5StickS3 連接', desc: '承接 M5StickS3 排針的插座。訊號從這裡連到內部的電路板和感測器。', spec: [['針數', '8']] },
-  vibrator: { name: '震動馬達', sub: '輸出（心跳模式）',
-    desc: '由 DRV8833 供電而轉動的震動馬達。每次從電腦收到 /heartrate，就輸出一次約 0.33 秒、像心跳一樣的震動。',
-    spec: [['波形', '0→220→220→130→40→80→0（PWM 值／255）'], ['長度', '50+80+60+25+35+80 = 330 ms'], ['外形', '約 φ7 × 25 mm']] },
-  chargerbase: { name: '充電模組底座', desc: '放置充電模組的底座零件。', spec: [['材質', '3D 列印樹脂']] },
-  drvcase: { name: '驅動器外殼', desc: '放置馬達驅動板和霍爾感測器的外殼。', spec: [['材質', '3D 列印樹脂']] },
+  shell: { name: '外殼（本體）', desc: '承載整體的底座外殼。內部零件全部收在裡面，左右兩側內面各貼有 2 片壓力感測器。', spec: [['材質', '3D 列印樹脂']] },
+  shellback: { name: '外殼後側零件', desc: '封住外殼後側下方的曲面樹脂零件。', spec: [['材質', '3D 列印樹脂']] },
+  holder: { name: 'XIAO 固定座', desc: '把 XIAO 直立固定的樹脂底座。上方的溝槽可容納震動馬達，底部附螺絲孔的凸緣用來固定在外殼上。', spec: [['材質', '3D 列印樹脂']] },
+  xiao: { sub: '控制・大腦（Bluetooth LE）',
+    desc: '作為裝置大腦、拇指大小的微控制器板。透過 Bluetooth LE 同時連接兩台裝置：對 Meta Quest 3 扮演「Xbox 遊戲手把」，對頭戴裝置則是下達指令的一方。依照 Quest 告知的階段（0〜8），讀取感測器或配合心跳產生震動。',
+    spec: [['無線', 'Bluetooth LE（對 Quest 3 為 HID 遊戲手把／對頭戴裝置為 GATT）'], ['名稱', 'NozuiBrain-X1（以 Xbox One S 的身分連線）'], ['輸入', '壓力 D0–D3（類比）／內建 IMU LSM6DS3（偵測投擲）'], ['輸出', 'DRV8833 D4・D5（PWM 20 kHz）'], ['電源', '偵測 USB 供電（底座）／充電中 P0.17／電池電壓'], ['LED', '紅色閃爍：未連線／綠：僅 Quest／藍色閃爍：僅頭戴裝置／水藍：兩者皆連線']] },
+  battery: { name: 'LiPo 電池', sub: '電源',
+    desc: '可充電的鋰聚合物電池。由 XIAO 內建的充電電路，透過底座的 USB 供電充電。每 2 秒量測一次電壓，換算成剩餘電量（%）告知 Quest。震動馬達的電源（DRV8833 的 VM）也來自這顆電池。',
+    spec: [['充電', 'XIAO 內建充電電路（100 mA）'], ['型號', '602535（3.7 V）'], ['電壓量測', '每 2 秒（馬達停止 0.2 秒後）'], ['告知 Quest', '電池剩餘電量 %（Battery Service 與 HID 兩種方式）'], ['外形', '6 × 25 × 35 mm']] },
   drv: { sub: '馬達驅動器',
-    desc: '把微控制器微弱的訊號，轉換成足以驅動馬達的大電流的「放大器」。M5StickS3 的腳位無法直接驅動馬達，所以中間要接這塊板子。',
-    spec: [['IC', 'TI DRV8833（雙 H 橋）'], ['IN1', 'GPIO8 ← PWM 1 kHz・8bit（最大 220/255）'], ['IN2', 'GPIO7 ← 固定 LOW（單向旋轉）'], ['輸出', '接到震動馬達']] },
-  tp: { sub: '充電模組（USB-C）',
-    desc: '從 USB-C 供電、為 LiPo 電池充電的小型模組。M5StickS3 讀取表示充電中的 CHRG 訊號，判斷 LiPo 是「充電中」還是「已充飽」。',
-    spec: [['IC', 'TP4057 線性充電 IC'], ['輸入', 'USB-C 5 V'], ['CHRG', 'GPIO6（LOW = 充電中，以 10 次取樣去除雜訊）'], ['判斷', '僅在 M5 供電中（VBUS ≥ 4.0 V）時']] },
-  hall: { name: '霍爾感測器', sub: '輸入（GPIO10）',
-    desc: '偵測磁鐵的感測器。在階段 3 時，輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。',
-    spec: [['模組', 'KY-003'], ['連接', 'GPIO10（數位輸入・上拉）'], ['電源', 'M5StickS3 的 EXT 5V 輸出'], ['傳送給電腦', '/magnet 1（階段 3）']] },
-  pressure: { name: '壓力感測器 ×4', sub: '輸入（GPIO1–4）',
-    desc: '左右兩側內面各貼 2 片的薄膜型壓力感測器。受壓時電阻會下降，M5StickS3 以 GPIO1–4 的類比輸入讀取這個變化。在階段 3 和 4 期間每 20ms 讀取一次，再以 0〜100 的數值透過 /power 傳送給電腦。',
-    spec: [['型號', 'RP-C10-ST（薄膜壓力感測器）'], ['數量', '4 片（左右各 2 片）'], ['連接', 'GPIO1 / 2 / 3 / 4（類比輸入）'], ['結構', 'PET 薄膜＋碳層＋銀電極、壓接端子'], ['傳送給電腦', '/power（補成 6ch，每 20ms）']] },
+    desc: '把微控制器微弱的訊號，轉換成足以驅動馬達的大電流的「放大器」。XIAO 的腳位無法直接驅動馬達，所以中間要接這塊板子。以來自電池的電源，讓震動馬達正轉或煞車（反轉）。',
+    spec: [['IC', 'TI DRV8833（雙 H 橋）'], ['AIN1 / AIN2', 'D4 / D5 ← PWM 20 kHz（人耳聽不到）'], ['電源 VM', '電池（BAT+，3.0〜4.2 V）'], ['強度上限', '依電池電壓限制脈寬，讓馬達承受的電壓不超過 3 V']] },
+  vibrator: { name: '震動馬達 ×2', sub: '輸出（心跳震動）',
+    desc: '從 DRV8833 接收電流而轉動的偏心配重式震動馬達（ERM），左右各 1 個。頭戴裝置傳來心跳時，只在階段 3・4 產生「撲・通」約 0.37 秒的震動。',
+    spec: [['種類', 'ERM（DC 3 V）'], ['數量', '2 個（左右）'], ['波形', '撲（強度 255）→ 間隔 0.11 秒 → 通（強度 180）'], ['長度', '約 370 ms（每拍結尾短暫反向煞車）'], ['外形', '約 φ7 × 25 mm']] },
+  pressure: { name: '壓力感測器 ×4', sub: '輸入（D0–D3）',
+    desc: '左右兩側內面各貼 2 片的薄膜型壓力感測器。受壓時電阻會改變，XIAO 以 D0〜D3 的類比輸入讀取這個變化。每 50ms 讀取一次，把未按壓時當作 0、用力按壓時當作 100 換算後，傳送給頭戴裝置和 Quest。',
+    spec: [['型號', 'RP-C10-ST（薄膜壓力感測器）'], ['數量', '4 片（左右各 2 片）'], ['連接', 'D0 / D1 / D2 / D3（12bit 類比輸入）'], ['結構', 'PET 薄膜＋碳層＋銀電極、壓接端子'], ['傳送對象', '頭戴裝置（補成 6ch）／Quest（總和作為扳機值）']] },
   pressurepins: { name: '壓力感測器的端子針腳', desc: '從壓力感測器端子伸出的 2 支針腳。組裝狀態下看不到，所以分解量超過 +100 mm 後才顯示。', spec: [['數量', '2 支 × 4 片']] },
   arm2: { name: '臂件 2（上蓋前側）', desc: '覆蓋頭頂的弧形外蓋前側。', spec: [['材質', '3D 列印樹脂']] },
   arm1: { name: '臂件 1（上蓋後側）', desc: '覆蓋頭頂的弧形外蓋後側。', spec: [['材質', '3D 列印樹脂']] },
 };
 const ZH_TOUR = [
-  { tab: '全體', title: '整體構成', flow: '電腦 ⇄ Wi‑Fi / OSC ⇄ M5StickS3',
-    text: 'M5StickS3 透過 Wi‑Fi 與電腦交換 OSC 訊息。電腦用 /phase 指定階段（0〜4），裝置會依照階段傳送感測器數值，或產生震動。' },
-  { tab: '通訊', title: '與電腦的溝通（OSC）', flow: '電腦 → /phase /heartrate /battery /init /reboot',
-    text: '開機後連上 Wi‑Fi，並向電腦傳送 /ask。之後每秒傳送電池狀態（/battery/m5、/battery/lipo）。階段 3 會傳送壓力與霍爾感測器，階段 4 會傳送壓力與撞擊。' },
-  { tab: '磁鐵', title: '輸入：霍爾感測器', flow: '霍爾感測器 → GPIO10 → M5StickS3 → /magnet',
-    text: '在階段 3 時，霍爾感測器的輸出從 LOW 切換成 HIGH 的瞬間，M5StickS3 會傳送 /magnet 給電腦。' },
-  { tab: '壓力', title: '輸入：壓力感測器（4ch）', flow: '壓力感測器 ×4 → GPIO1–4 → 補成 6ch → /power（每 20ms）',
-    text: '外殼左右兩側的內面，各貼有 2 片薄膜型壓力感測器。在階段 3 和 4 期間，每 20ms 讀取這 4 個感測器。把相鄰的數值稍微混合、擴展成 6ch，再以 0〜100 的數值透過 /power 傳送。' },
-  { tab: '撞擊', title: '輸入：撞擊（內建 IMU）', flow: 'IMU → 加速度變化 > 5G → /gravity',
-    text: '在階段 4，用 M5StickS3 內建的 IMU 監看加速度大小。與上一次的值相比變化超過 5G 時，只傳送一次 /gravity 給電腦（階段開始後 0.5 秒內忽略）。' },
-  { tab: '震動', title: '輸出：心跳震動', flow: '/heartrate → GPIO8 PWM → DRV8833 → 震動馬達',
-    text: '在階段 2 以上從電腦收到 /heartrate 1 時，會輸出一次約 0.33 秒的震動。強度（PWM 值）依 0→220→220→130→40→80→0 變化。PWM 從 GPIO8 以 1kHz 輸出，經 DRV8833 放大後驅動震動馬達。' },
-  { tab: '電源', title: '電源：充電與電池監測', flow: 'USB-C → TP4057 → LiPo ／ CHRG → GPIO6 ／ 電壓 → GPIO5',
-    text: 'TP4057 透過 USB-C 為 LiPo 充電。M5StickS3 會持續監測 LiPo 的電壓（GPIO5）以及是否正在充電（GPIO6）。LiPo 低於 3.55V，或本體電量低於 20% 時，紅色 LED 會閃爍。按鈕連按 2 次，會進入停止 Wi‑Fi 和震動的僅充電模式。' },
+  { tab: '全體', title: '整體構成', flow: 'Quest 3 ⇄ BLE ⇄ XIAO ⇄ BLE ⇄ 頭戴裝置',
+    text: 'XIAO nRF52840 Sense 透過 Bluetooth LE 同時連接兩台裝置。從 Meta Quest 3 接收體驗的進度（階段 0〜8），並把階段與壓力數值傳給頭戴裝置。依照階段，回報被按壓、被丟出、從底座拿起等狀態，或配合心跳產生震動。' },
+  { tab: '通訊', title: '與 Quest・頭戴裝置的溝通（BLE）', flow: 'Quest →（震動強度）→ 階段 ／ XIAO → 頭戴裝置 0x00〜0x03',
+    text: '對 Quest 3 來說，這台裝置是一支 Xbox One S 遊戲手把。Quest 以「震動強度」(階段+1)/10 告知階段，裝置則以按鈕（A：丟出／B：從底座拿起／X：供電中斷）和扳機（壓力總和）回應。對頭戴裝置，會在階段改變時以及每秒傳送目前的階段（0x03），也會下達階段 2 開始（0x01）和停止（0x00）的指令。' },
+  { tab: '壓力', title: '輸入：壓力感測器（4ch）', flow: '壓力感測器 ×4 → D0–D3 → 0〜100 → 頭戴裝置（6ch）・Quest（扳機）',
+    text: '外殼左右兩側的內面，各貼有 2 片薄膜型壓力感測器。XIAO 每 50ms 讀取這 4 個感測器，把未按壓時當作 0、用力按壓時當作 100 換算。在階段 3 和 4 期間，把相鄰的數值混合、擴展成 6ch 傳給頭戴裝置的伺服馬達，並把 4 個的總和當作 Quest 的扳機值傳送。按壓時數值會變大還是變小，由最初幾次按壓自動判斷並儲存。' },
+  { tab: '投擲', title: '輸入：投擲（內建 IMU）', flow: 'IMU（200 Hz）→ 自由落下 → 落地衝擊 → A 按鈕',
+    text: '在階段 4，用 XIAO 內建的 IMU（LSM6DS3）每秒 200 次監看加速度和旋轉。接近無重力（低於 0.3G）的狀態持續一段時間，就判斷為「丟出／掉落」；之後若衝擊夠大（12G 以上，或 7G 以上且就此靜止），就判斷為「掉到地上」，傳送 A 按鈕給 Quest。用手接住時不傳送任何訊號。' },
+  { tab: '底座', title: '輸入：從底座拿起', flow: '底座 USB 供電 → XIAO → B 按鈕 ／ X 按鈕',
+    text: '裝置放在底座上時，會透過 USB 供電。XIAO 會監看是否有供電，在階段 3 被從底座拿起的瞬間，傳送 B 按鈕給 Quest。供電中斷期間會一直按住 X 按鈕，通知 Quest。放回底座、恢復供電時，會震動一次心跳作為提示。' },
+  { tab: '震動', title: '輸出：心跳震動', flow: '頭戴裝置的心跳 → XIAO D4・D5 PWM → DRV8833 → 震動馬達 ×2',
+    text: '每當頭戴裝置傳來心跳訊號，只在階段 3・4 時，XIAO 從 D4・D5 輸出 20kHz 的 PWM，經 DRV8833 放大後驅動震動馬達。強烈的「撲」、0.11 秒的間隔、稍弱的「通」，共約 0.37 秒；每拍結尾會短暫反轉，讓震動俐落收尾。' },
+  { tab: '電源', title: '電源：充電與電池電量', flow: '底座 USB → XIAO 充電電路 → LiPo ／ 電壓 → 電量 % → Quest',
+    text: '透過底座的 USB 供電，由 XIAO 內建的充電電路為 LiPo 充電（100mA）。XIAO 每 2 秒量測電池電壓，換算成剩餘電量（%）告知 Quest。震動馬達的電源也來自電池，並依電池電壓限制 PWM 的脈寬，讓馬達承受的電壓不超過 3V。' },
 ];
-// 繁體中文 first. Every visit opens in it and the idle reset returns to it, so one visitor's
+const EN_PARTS = {
+  brain: { name: 'Brain-shaped gel shell', desc: 'The brain-shaped outer shell that wraps the whole device. It is cast in ultra-soft urethane gel and gives way softly under your fingers. All the mechanical parts sit inside the gel.', spec: [['Material', 'Ultra-soft urethane gel'], ['Size', 'approx. 96 × 127 × 83 mm']] },
+  braincover: { name: 'Gel base cover', desc: 'The oval lid that fits the recess in the bottom of the brain. It is made of the same ultra-soft urethane gel; the device sits in the cavity above it, behind a layer of gel.', spec: [['Material', 'Ultra-soft urethane gel'], ['Size', 'approx. 49 × 81 × 10 mm']] },
+  shell: { name: 'Shell (device housing)', desc: 'The base housing that holds everything. All the internal parts sit inside it, and two pressure sensors are stuck to each of its left and right inner walls.', spec: [['Material', '3D-printed resin']] },
+  shellback: { name: 'Shell rear piece', desc: 'A curved resin piece that closes the lower back of the shell.', spec: [['Material', '3D-printed resin']] },
+  holder: { name: 'XIAO holder', desc: 'The resin stand that holds the XIAO upright. A vibration motor sits in the groove on top, and a flange with screw holes at the bottom fixes it to the shell.', spec: [['Material', '3D-printed resin']] },
+  xiao: { sub: 'Controller · the brain (Bluetooth LE)',
+    desc: 'A thumb-sized microcontroller board that is the device\'s brain. It talks to two devices at once over Bluetooth LE: to the Meta Quest 3 it appears as an Xbox gamepad, and to the headgear it is the one giving orders. Following the phase (0–8) the Quest reports, it reads the sensors or pulses the heartbeat.',
+    spec: [['Radio', 'Bluetooth LE (HID gamepad to Quest 3 / GATT to the headgear)'], ['Name', 'NozuiBrain-X1 (shows up as an Xbox One S)'], ['Inputs', 'Pressure D0–D3 (analog) / built-in IMU LSM6DS3 (throw detection)'], ['Outputs', 'DRV8833 D4 · D5 (PWM 20 kHz)'], ['Power', 'USB power detect (stand) / charging P0.17 / battery voltage'], ['LED', 'Red blink: not connected / green: Quest only / blue blink: headgear only / cyan: both']] },
+  battery: { name: 'LiPo battery', sub: 'Power',
+    desc: 'A rechargeable lithium-polymer cell. The XIAO\'s built-in charger charges it from the stand\'s USB power. Its voltage is measured every 2 s and reported to the Quest as a percentage. The vibration motors (DRV8833 VM) are powered from it too.',
+    spec: [['Type', '602535 (3.7 V)'], ['Charging', 'XIAO built-in charger (100 mA)'], ['Voltage check', 'every 2 s (0.2 s after the motors stop)'], ['To the Quest', 'battery % (Battery Service and HID)'], ['Size', '6 × 25 × 35 mm']] },
+  drv: { sub: 'Motor driver',
+    desc: 'The "amplifier" that turns the microcontroller\'s weak signal into enough current to spin a motor. The XIAO\'s pins cannot drive a motor directly, so this board sits in between. Powered from the battery, it drives the vibration motors forwards and brakes them (reverse).',
+    spec: [['IC', 'TI DRV8833 (dual H-bridge)'], ['AIN1 / AIN2', 'D4 / D5 ← PWM 20 kHz (inaudible)'], ['VM supply', 'battery (BAT+, 3.0–4.2 V)'], ['Strength limit', 'pulse width limited to the battery voltage so the motor never sees more than 3 V']] },
+  vibrator: { name: 'Vibration motors ×2', sub: 'Output (heartbeat)',
+    desc: 'Eccentric-weight vibration motors (ERM) driven by the DRV8833, one on each side. When a heartbeat arrives from the headgear, they play a "lub-dub" of about 0.37 s — only in phases 3 and 4.',
+    spec: [['Type', 'ERM (DC 3 V)'], ['Count', '2 (left and right)'], ['Waveform', 'lub (strength 255) → 0.11 s gap → dub (strength 180)'], ['Length', 'approx. 370 ms (a short reverse brake at the end of each beat)'], ['Size', 'approx. φ7 × 25 mm']] },
+  pressure: { name: 'Pressure sensors ×4', sub: 'Input (D0–D3)',
+    desc: 'Thin-film pressure sensors, two stuck to each of the shell\'s inner side walls. Pressing changes their resistance, which the XIAO reads on analog inputs D0–D3. It reads them every 50 ms, scales them to 0 (untouched) – 100 (pressed hard), and sends them to the headgear and the Quest.',
+    spec: [['Model', 'RP-C10-ST (thin-film pressure sensor)'], ['Count', '4 (two per side)'], ['Wiring', 'D0 / D1 / D2 / D3 (12-bit analog in)'], ['Build', 'PET film + carbon layer + silver electrodes, crimp terminals'], ['Sent to', 'headgear (spread to 6 ch) / Quest (sum as the trigger value)']] },
+  pressurepins: { name: 'Pressure sensor pins', desc: 'The two pins coming out of each pressure sensor\'s terminal. They are hidden when assembled, so they only appear once the explode passes +100 mm.', spec: [['Count', '2 × 4 sensors']] },
+  arm2: { name: 'Arm 2 (front top cover)', desc: 'The front half of the curved cover over the top.', spec: [['Material', '3D-printed resin']] },
+  arm1: { name: 'Arm 1 (rear top cover)', desc: 'The rear half of the curved cover over the top.', spec: [['Material', '3D-printed resin']] },
+};
+const EN_TOUR = [
+  { tab: 'Overview', title: 'How it fits together', flow: 'Quest 3 ⇄ BLE ⇄ XIAO ⇄ BLE ⇄ headgear',
+    text: 'The XIAO nRF52840 Sense connects to two devices at once over Bluetooth LE. It gets the progress of the experience (phase 0–8) from the Meta Quest 3 and sends the phase and the pressure values on to the headgear. Depending on the phase, it reports being pressed, thrown or lifted off its stand, or pulses with the heartbeat.' },
+  { tab: 'Link', title: 'Talking to the Quest and the headgear (BLE)', flow: 'Quest → (rumble strength) → phase ／ XIAO → headgear 0x00–0x03',
+    text: 'To the Quest 3 this device looks like an Xbox One S gamepad. The Quest sends the phase as a rumble strength of (phase + 1) / 10, and the device answers with buttons (A: thrown / B: lifted off the stand / X: power cable unplugged) and the trigger (sum of the pressures). To the headgear it sends the current phase (0x03) whenever it changes and once a second, and also commands the start of phase 2 (0x01) and stop (0x00).' },
+  { tab: 'Pressure', title: 'Input: pressure sensors (4 ch)', flow: 'Pressure sensors ×4 → D0–D3 → 0–100 → headgear (6 ch) · Quest (trigger)',
+    text: 'Two thin-film pressure sensors are stuck to each inner side wall of the shell. The XIAO reads all four every 50 ms and scales them so 0 is untouched and 100 is pressed hard. In phases 3 and 4 it blends neighbouring values into 6 channels for the headgear\'s servos and sends the sum of all four to the Quest as the trigger value. Whether pressing raises or lowers the reading is worked out from the first few presses and saved.' },
+  { tab: 'Throw', title: 'Input: throw (built-in IMU)', flow: 'IMU (200 Hz) → free fall → landing impact → A button',
+    text: 'In phase 4 the XIAO\'s built-in IMU (LSM6DS3) watches acceleration and rotation 200 times a second. When it is nearly weightless (under 0.3 G) for a while it counts as "thrown / dropped", and if the impact afterwards is strong (12 G or more, or 7 G or more and then still) it counts as "hit the floor" and sends the A button to the Quest. Catching it in your hands sends nothing.' },
+  { tab: 'Stand', title: 'Input: lifted off the stand', flow: 'Stand USB power → XIAO → B button ／ X button',
+    text: 'While the device sits on its stand it is powered over USB. The XIAO watches that power, and the moment it is lifted off in phase 3 it sends the B button to the Quest. While the power is gone it holds the X button down to let the Quest know. When it is put back and power returns, it plays one heartbeat as a signal.' },
+  { tab: 'Vibration', title: 'Output: heartbeat vibration', flow: 'Headgear heartbeat → XIAO D4 · D5 PWM → DRV8833 → vibration motors ×2',
+    text: 'Every time a heartbeat arrives from the headgear — only in phases 3 and 4 — the XIAO outputs a 20 kHz PWM on D4 · D5, which the DRV8833 amplifies to spin the vibration motors. A strong "lub", a 0.11 s gap, then a slightly softer "dub", about 0.37 s in all; each beat ends with a short reverse spin for a crisp stop.' },
+  { tab: 'Power', title: 'Power: charging and battery level', flow: 'Stand USB → XIAO charger → LiPo ／ voltage → % → Quest',
+    text: 'With power from the stand\'s USB, the XIAO\'s built-in charger charges the LiPo (100 mA). The XIAO measures the battery voltage every 2 s and reports it to the Quest as a percentage. The vibration motors also run from the battery, and the PWM width is limited to the battery voltage so the motors never see more than 3 V.' },
+];
+// English first. Every visit opens in it and the idle reset returns to it, so one visitor's
 // choice does not carry over to the next (nothing is stored).
-let LANG = 'zh';
+let LANG = 'en';
 const ui = (k) => UI[LANG][k];
-const P = (p, k) => (LANG === 'zh' && ZH_PARTS[p.id] && ZH_PARTS[p.id][k]) || p[k];
-const T = (i, k) => (LANG === 'zh' && ZH_TOUR[i][k]) || TOUR[i][k];
+const L10N = { zh: { parts: ZH_PARTS, tour: ZH_TOUR }, en: { parts: EN_PARTS, tour: EN_TOUR } };  // Japanese is the base text
+const P = (p, k) => (L10N[LANG] && L10N[LANG].parts[p.id] && L10N[LANG].parts[p.id][k]) || p[k];
+const T = (i, k) => (L10N[LANG] && L10N[LANG].tour[i][k]) || TOUR[i][k];
 
 
 // ---------- Renderer / scene ----------
@@ -745,8 +769,8 @@ function onModel(gltf) {
   gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
   const pathOf = (m) => (m.userData && m.userData.path) || '';
   const claimed = new Set();
-  // claim order: the most specific selectors first, so the M5's screws / socket are not swallowed by m5
-  const order = [...PARTS].sort((a, b) => (a.id === 'm5') - (b.id === 'm5'));
+  // claim order: PARTS order (a mesh goes to the first part whose selector matches)
+  const order = PARTS;
   for (const p of order) p.srcs = meshes.filter((m) => !claimed.has(m) && p.sel.test(pathOf(m)) && claimed.add(m));
   const loose = meshes.filter((m) => !claimed.has(m));
   if (loose.length) console.warn('meshes not in any part:', [...new Set(loose.map(pathOf))]);
@@ -754,7 +778,7 @@ function onModel(gltf) {
     p.objs = [];
     const box = new THREE.Box3();
     // One draw call per surface finish: every face of the part with the same finish is merged
-    // (e.g. the TP4057's 94 solids become a handful of meshes). Looks the same, far fewer draws.
+    // (e.g. the XIAO's 31 solids become a handful of meshes). Looks the same, far fewer draws.
     const byFinish = new Map();
     const over = p.finish === 'gel' ? GEL : p.finish;
     for (const src of p.srcs) {
@@ -1097,9 +1121,8 @@ function goStep(i) {
 // Language switch: re-renders every text in place (keeps view, step and explode as they are)
 function setLang(l) {
   LANG = l;
-  document.documentElement.lang = l === 'zh' ? 'zh-Hant' : 'ja';
-  document.getElementById('lang-ja').setAttribute('aria-pressed', l === 'ja');
-  document.getElementById('lang-zh').setAttribute('aria-pressed', l === 'zh');
+  document.documentElement.lang = { ja: 'ja', zh: 'zh-Hant', en: 'en' }[l];
+  for (const k of ['en', 'ja', 'zh']) document.getElementById('lang-' + k).setAttribute('aria-pressed', l === k);
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     if (el.id === 'loading' && el.hidden) return;
     el.textContent = ui(el.dataset.i18n);
@@ -1110,6 +1133,7 @@ function setLang(l) {
   if (S.selected) renderSheet(S.selected);
   if (callouts.length) layoutCallouts();
 }
+document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
 document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
 document.getElementById('lang-zh').addEventListener('click', () => setLang('zh'));
 setLang(LANG);
@@ -1457,7 +1481,7 @@ function backToStart() {
   pulse = null;
   if (S.mode !== 'explore') setMode('explore');
   select(null);
-  if (LANG !== 'zh') setLang('zh');
+  if (LANG !== 'en') setLang('en');
   const ghost = document.getElementById('t-ghost'), spin = document.getElementById('t-spin');
   if (ghost.getAttribute('aria-pressed') === 'true') ghost.click();
   if (spin.getAttribute('aria-pressed') !== 'true') spin.click();

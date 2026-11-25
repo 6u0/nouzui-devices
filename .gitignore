@@ -3,4 +3,6 @@ dist/
 # conversion intermediates (rebuilt by `npm run convert`)
 raw.json
 step-colors.json
+raw-old.json
+step-colors-old.json
 match-report.txt

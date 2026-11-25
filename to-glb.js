@@ -23,6 +23,10 @@ const match = res.meshes.map((m, mi) => {
   let best = null, gap = 5;  // mm; vertex boxes miss bulging curved faces, so allow some slack (closest wins)
   for (const s of solids) if (s.faces === n && s.box && boxGap(s.box, mb) < gap) { gap = boxGap(s.box, mb); best = s; }
   if (best) { exact.add(mi); return best; }
+  // the only solid with this face count is a sure match too (big curved bodies whose vertex box
+  // misses the bulge by more than the slack, e.g. the SIGGRAPH shell and the gel base cover)
+  const same = solids.filter((s) => s.faces === n);
+  if (same.length === 1) { exact.add(mi); return same[0]; }
   for (let k = ptr; k < solids.length; k++) if (solids[k].faces === n) { ptr = k + 1; return solids[k]; }
   for (let k = 0; k < solids.length; k++) if (solids[k].faces === n) return solids[k];
   return null;
@@ -42,6 +46,9 @@ const toLinear = (c) => {
 const CONFIG = fs.existsSync('to-glb.config.json') ? JSON.parse(fs.readFileSync('to-glb.config.json', 'utf8')) : {};
 const SHIFT_PARTS = new Set((CONFIG.shift && CONFIG.shift.parts) || []);
 const SHIFT_BY = (CONFIG.shift && CONFIG.shift.by) || [0, 0, 0];
+// "recolor": { "<STEP solid name>": "3f3f3f" } sets a solid's base colour (for STEPs exported without
+// colours; faces with their own colour keep it).
+const RECOLOR = CONFIG.recolor || {};
 const shiftOf = (i) => (SHIFT_PARTS.has(match[i] && match[i].name) ? SHIFT_BY : [0, 0, 0]);
 let lift = Infinity;
 res.meshes.forEach((m, i) => {
@@ -157,7 +164,8 @@ function build() {
     let idx = new Uint32Array(m.index.array);
     const smooth = m.brep_faces.length >= SMOOTH_MIN_FACES;
     const s = match[i];
-    const base = m.color || [0.6, 0.6, 0.6];
+    const re = RECOLOR[exact.has(i) && s && s.name];
+    const base = re ? [0, 2, 4].map((k) => parseInt(re.slice(k, k + 2), 16) / 255) : m.color || [0.6, 0.6, 0.6];
     if (smooth) ({ pos, nrm, idx } = weld(pos, idx));  // one colour for the whole body
     let col = new Float32Array(pos.length);
     const lin = toLinear(base);
